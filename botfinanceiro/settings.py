@@ -112,5 +112,5 @@ URL_BASE_TELEGRAM = 'https://api.telegram.org/bot'
 TOKEN_BOT=config('TOKEN_BOT')
 
 # API Mercado Pago
-TOKEN_API_MERCADOPAGO=config('TOKEN_API_MERCADOPAGO')
+TOKEN_API_MERCADOPAGO_TEST=config('TOKEN_API_MERCADOPAGO_TEST')
 URL_CRIAR_PLANO = 'https://api.mercadopago.com/preapproval_plan'

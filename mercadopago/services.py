@@ -8,7 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 def gerar_plano():
     headers = {
-        'Authorization': settings.TOKEN_API_MERCADOPAGO,
+        'Authorization': f'Bearer {settings.TOKEN_API_MERCADOPAGO_TEST}',
         'Content-Type': 'application/json'
     }
 
@@ -21,13 +21,13 @@ def gerar_plano():
             "currency_id": "BRL"
         },
 
-        # "back_url": "https://stasker.onrender.com/dashboard",
-        "status": "pending",
-        # "notification_url": "https://stasker.onrender.com/planos/notificacoes_pagamentos/"
+        "back_url": "https://t.me/FechaContaBot",
+        "status": "inactive",
+        "notification_url": "https://joey-tinnier-cristopher.ngrok-free.dev/mercadopago/webhook/"
     }
-
+    
+    
     response = requests.post(settings.URL_CRIAR_PLANO, json=parametros_api, headers=headers)
-    print(response.json())
     return response.json()
 
 @csrf_exempt
