@@ -35,8 +35,8 @@ def webhook_bot(request):
         callback_query_id = dados["message"]["chat"]["id"]
         telegram = TelegramService(telegram_id=telegram_id, chat_id=chat_id, callback_query_id=callback_query_id)
 
-        if botao_clicado == 'receita':
-            telegram.processar('receita')
+        if botao_clicado == 'despesa':
+            telegram.processar('despesa')
         elif botao_clicado == 'faturamento':
             telegram.processar('faturamento')
         elif botao_clicado == 'gastos':

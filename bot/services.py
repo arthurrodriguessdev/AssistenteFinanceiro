@@ -1,9 +1,10 @@
 import requests
 from django.conf import settings
-from comum.models import Usuario
+from comum.models import Usuario, StatusUsuario, Transacao, TransacaoChoices
+from comum.services import get_usuario
 from mercadopago import services
 from django.http import JsonResponse
-from django.utils.safestring import mark_safe
+from datetime import datetime
 
 URL_ENVIAR_MSG = f'{settings.URL_BASE_TELEGRAM}{settings.TOKEN_BOT}/sendMessage'
 URL_CONFIRMAR_CLIQUE_BOTAO = f'{settings.URL_BASE_TELEGRAM}{settings.TOKEN_BOT}/answerCallbackQuery'
@@ -72,13 +73,17 @@ class TelegramService():
             usuario = self.criar_usuario()
             if usuario is not None:
                 return self.boas_vindas(usuario)
-        
-        if acao is not None and self.callback_query_id is not None:
-            if acao == 'receita': return self.registrar_despesa()
-            elif acao == 'faturamento': return self.registrar_faturamento()
-            elif acao == 'gastos': return self.exibir_gastos()
 
-        return self.menu_principal()
+        usuario = get_usuario(self.telegram_id)
+        if acao is not None and self.callback_query_id is not None:
+            if usuario is not None:
+                if acao == 'despesa': return 1
+                elif acao == 'faturamento': return self.registrar_faturamento(usuario, self.text)
+                elif acao == 'gastos': return self.exibir_gastos()
+        else:
+            if usuario:
+                self.alterar_status_usuario(StatusUsuario.AGUARDANDO_MENU)
+                return self.menu_principal(usuario)
     
     def usuario_existe(self):
         return Usuario.objects.filter(telegram_id=self.telegram_id).exists()
@@ -127,21 +132,55 @@ class TelegramService():
     
     def registrar_despesa(self):
         mensagem_enviar = f'Registrando Despesa'
-        print('aaa')
         TelegramClient.callback(self.callback_query_id)
         TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
     
-    def registrar_faturamento(self):
-        mensagem_enviar = f'Registrando Faturamento'
+    def registrar_faturamento(self, usuario, text):
+        mensagem_enviar = ''
         TelegramClient.callback(self.callback_query_id)
-        TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+        enviou_faturamento = text is not None
 
+        # Altera o status se acabou de solicitar o registro de faturamento
+        if usuario.status == StatusUsuario.AGUARDANDO_MENU:
+            self.alterar_status_usuario(StatusUsuario.AGUARDANDO_INFORMAR_FATURAMENTO)
+
+        elif usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_FATURAMENTO and enviou_faturamento:
+            self.alterar_status_usuario(StatusUsuario.INFORMOU_FATURAMENTO)
+
+        if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_FATURAMENTO:
+            mensagem_enviar = (
+                f'Informe seu faturamento mensal. Exemplo válido: 1500.00\n'
+                f'OBS: Insira apenas o valor referente ao mês atual. Ele será adicionado ao saldo acumulado do período.'
+            )
+
+            return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+
+        elif usuario.status == StatusUsuario.INFORMOU_FATURAMENTO and enviou_faturamento:
+            faturamento = str(text)
+
+            if ',' in faturamento:
+                faturamento = faturamento.replace(',', '.')
+            
+            # Registra o faturamento
+            transacao = Transacao.objects.create(
+                usuario=usuario,
+                transacao=TransacaoChoices.FATURAMENTO,
+                descricao='Faturamento Registrado',
+                registrada_em=datetime.now(),
+                valor=float(faturamento)
+            )
+
+            self.alterar_status_usuario(StatusUsuario.AGUARDANDO_MENU)
+            mensagem_enviar = (f'Faturamento de R${transacao.valor} registrado com sucesso!\n')
+            return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+        
     def exibir_gastos(self):
         mensagem_enviar = f'Exibindo Gastos'
         TelegramClient.callback(self.callback_query_id)
         TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
 
-    def menu_principal(self):
+    def menu_principal(self, usuario):
+        self.alterar_status_usuario(StatusUsuario.AGUARDANDO_MENU)
         mensagem_enviar = (
             'Olá! Como posso ajudar na sua gestão financeira hoje?\n\n'
             'Escolha uma das opções abaixo para começar:'
@@ -150,8 +189,8 @@ class TelegramService():
         botoes = [
             [
                 {
-                    "text": "Cadastrar Receita",
-                    "callback_data": "receita"
+                    "text": "Cadastrar Despesa",
+                    "callback_data": "despesa"
                 }
             ],
             [
@@ -173,3 +212,8 @@ class TelegramService():
             self.chat_id, 
             botoes
         )
+    
+    def alterar_status_usuario(self, status):
+        usuario = get_usuario(self.telegram_id)
+        usuario.status = status
+        usuario.save()
