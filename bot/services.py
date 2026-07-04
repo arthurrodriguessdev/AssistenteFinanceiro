@@ -81,9 +81,11 @@ class TelegramService():
                 elif acao == 'faturamento': return self.registrar_faturamento(usuario, self.text)
                 elif acao == 'gastos': return self.exibir_gastos()
         else:
-            if usuario:
-                self.alterar_status_usuario(StatusUsuario.AGUARDANDO_MENU)
+            if usuario.ativo:
+                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
                 return self.menu_principal(usuario)
+            else:
+                return self.boas_vindas(usuario)
     
     def usuario_existe(self):
         return Usuario.objects.filter(telegram_id=self.telegram_id).exists()
@@ -142,10 +144,10 @@ class TelegramService():
 
         # Altera o status se acabou de solicitar o registro de faturamento
         if usuario.status == StatusUsuario.AGUARDANDO_MENU:
-            self.alterar_status_usuario(StatusUsuario.AGUARDANDO_INFORMAR_FATURAMENTO)
+            usuario.set_status(StatusUsuario.AGUARDANDO_INFORMAR_FATURAMENTO)
 
         elif usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_FATURAMENTO and enviou_faturamento:
-            self.alterar_status_usuario(StatusUsuario.INFORMOU_FATURAMENTO)
+            usuario.set_status(StatusUsuario.INFORMOU_FATURAMENTO)
 
         if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_FATURAMENTO:
             mensagem_enviar = (
@@ -170,7 +172,7 @@ class TelegramService():
                 valor=float(faturamento)
             )
 
-            self.alterar_status_usuario(StatusUsuario.AGUARDANDO_MENU)
+            usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
             mensagem_enviar = (f'Faturamento de R${transacao.valor} registrado com sucesso!\n')
             return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
         
@@ -180,7 +182,7 @@ class TelegramService():
         TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
 
     def menu_principal(self, usuario):
-        self.alterar_status_usuario(StatusUsuario.AGUARDANDO_MENU)
+        usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
         mensagem_enviar = (
             'Olá! Como posso ajudar na sua gestão financeira hoje?\n\n'
             'Escolha uma das opções abaixo para começar:'
@@ -212,8 +214,3 @@ class TelegramService():
             self.chat_id, 
             botoes
         )
-    
-    def alterar_status_usuario(self, status):
-        usuario = get_usuario(self.telegram_id)
-        usuario.status = status
-        usuario.save()

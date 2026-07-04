@@ -31,6 +31,10 @@ class Usuario(models.Model):
 
     def __str__(self):
         return f'{self.nome} {self.sobrenome}'
+    
+    def set_status(self, status):
+        self.status = status
+        self.save()
 
 
 class Transacao(models.Model):

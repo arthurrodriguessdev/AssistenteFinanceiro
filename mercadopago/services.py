@@ -17,7 +17,7 @@ def gerar_plano():
         "auto_recurring": {
             "frequency": 1,
             "frequency_type": "months",
-            "transaction_amount": 19.90,
+            "transaction_amount": 1.00,
             "currency_id": "BRL"
         },
 
