@@ -43,3 +43,6 @@ class Transacao(models.Model):
     descricao = models.CharField(max_length=250)
     registrada_em = models.DateTimeField(auto_now_add=True)
     valor = models.DecimalField(decimal_places=2, max_digits=10)
+
+    def __str__(self):
+        return f'{self.descricao} - R$ {self.valor}'

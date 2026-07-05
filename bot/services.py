@@ -3,6 +3,7 @@ from django.conf import settings
 from comum.models import Usuario, StatusUsuario, Transacao, TransacaoChoices
 from comum.services import get_usuario
 from mercadopago import services
+from bot.mensagem import MensagemBot
 from django.http import JsonResponse
 from datetime import datetime
 
@@ -15,7 +16,6 @@ class TelegramClient():
         try:
             json = {'chat_id': chat_id, 'text': text}
             response = requests.post(URL_ENVIAR_MSG, json=json)
-            print(response.text)
         except Exception as e:
             print(e)
     
@@ -81,7 +81,14 @@ class TelegramService():
                 elif acao == 'faturamento': return self.registrar_faturamento(usuario, self.text)
                 elif acao == 'gastos': return self.exibir_gastos()
         else:
-            if usuario.ativo:
+            if usuario:
+
+                # Faturamento
+                enviou_faturamento = self.text is not None
+                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_FATURAMENTO and enviou_faturamento:
+                    usuario.set_status(StatusUsuario.INFORMOU_FATURAMENTO)
+                    return self.registrar_faturamento(usuario, self.text)
+                
                 usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
                 return self.menu_principal(usuario)
             else:
@@ -140,14 +147,10 @@ class TelegramService():
     def registrar_faturamento(self, usuario, text):
         mensagem_enviar = ''
         TelegramClient.callback(self.callback_query_id)
-        enviou_faturamento = text is not None
-
+        
         # Altera o status se acabou de solicitar o registro de faturamento
         if usuario.status == StatusUsuario.AGUARDANDO_MENU:
             usuario.set_status(StatusUsuario.AGUARDANDO_INFORMAR_FATURAMENTO)
-
-        elif usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_FATURAMENTO and enviou_faturamento:
-            usuario.set_status(StatusUsuario.INFORMOU_FATURAMENTO)
 
         if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_FATURAMENTO:
             mensagem_enviar = (
@@ -157,7 +160,7 @@ class TelegramService():
 
             return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
 
-        elif usuario.status == StatusUsuario.INFORMOU_FATURAMENTO and enviou_faturamento:
+        elif usuario.status == StatusUsuario.INFORMOU_FATURAMENTO:
             faturamento = str(text)
 
             if ',' in faturamento:
@@ -166,7 +169,7 @@ class TelegramService():
             # Registra o faturamento
             transacao = Transacao.objects.create(
                 usuario=usuario,
-                transacao=TransacaoChoices.FATURAMENTO,
+                tipo=TransacaoChoices.FATURAMENTO,
                 descricao='Faturamento Registrado',
                 registrada_em=datetime.now(),
                 valor=float(faturamento)
@@ -183,10 +186,6 @@ class TelegramService():
 
     def menu_principal(self, usuario):
         usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
-        mensagem_enviar = (
-            'Olá! Como posso ajudar na sua gestão financeira hoje?\n\n'
-            'Escolha uma das opções abaixo para começar:'
-        )
 
         botoes = [
             [
@@ -210,7 +209,7 @@ class TelegramService():
         ]
 
         TelegramClient.enviar_mensagens_botoes(
-            mensagem_enviar, 
+            MensagemBot.mensagem_menu(), 
             self.chat_id, 
             botoes
         )
