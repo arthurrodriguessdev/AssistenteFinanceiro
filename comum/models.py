@@ -9,6 +9,7 @@ class StatusUsuario(models.IntegerChoices):
     INFORMOU_FATURAMENTO = 4, "Informou Despesa"
 
     AGUARDANDO_INFORMAR_DESPESA = 5, "Aguardando Informar Despesa"
+    INFORMOU_DESPESA = 6, "Informou Despesa"
     
 
 class TransacaoChoices(models.IntegerChoices):

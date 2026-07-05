@@ -1,7 +1,7 @@
 import requests
 from django.conf import settings
 from comum.models import Usuario, StatusUsuario, Transacao, TransacaoChoices
-from comum.services import get_usuario
+from comum.services import get_usuario, calcular_valor_total_despesas
 from mercadopago import services
 from bot.mensagem import MensagemBot
 from django.http import JsonResponse
@@ -77,17 +77,22 @@ class TelegramService():
         usuario = get_usuario(self.telegram_id)
         if acao is not None and self.callback_query_id is not None:
             if usuario is not None:
-                if acao == 'despesa': return 1
+                if acao == 'despesa': return self.registrar_despesa(usuario, self.text)
                 elif acao == 'faturamento': return self.registrar_faturamento(usuario, self.text)
                 elif acao == 'gastos': return self.exibir_gastos()
         else:
             if usuario:
 
                 # Faturamento
-                enviou_faturamento = self.text is not None
-                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_FATURAMENTO and enviou_faturamento:
+                enviou_despesa_faturamento = self.text is not None
+                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_FATURAMENTO and enviou_despesa_faturamento:
                     usuario.set_status(StatusUsuario.INFORMOU_FATURAMENTO)
                     return self.registrar_faturamento(usuario, self.text)
+                
+                # Despesa
+                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_DESPESA and enviou_despesa_faturamento:
+                    usuario.set_status(StatusUsuario.INFORMOU_DESPESA)
+                    return self.registrar_despesa(usuario, self.text)
                 
                 usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
                 return self.menu_principal(usuario)
@@ -139,10 +144,36 @@ class TelegramService():
 
         TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
     
-    def registrar_despesa(self):
+    def registrar_despesa(self, usuario, text):
         mensagem_enviar = f'Registrando Despesa'
         TelegramClient.callback(self.callback_query_id)
-        TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+
+        if usuario.status == StatusUsuario.AGUARDANDO_MENU:
+            usuario.set_status(StatusUsuario.AGUARDANDO_INFORMAR_DESPESA)
+        
+        if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_DESPESA:
+            mensagem_enviar = f'Informe sua despesa, por favor.'
+            return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+        
+        elif usuario.status == StatusUsuario.INFORMOU_DESPESA:
+            despesa = str(text)
+
+            if ',' in despesa:
+                despesa = despesa.replace(',', '.')
+            
+            # Registra o faturamento
+            transacao = Transacao.objects.create(
+                usuario=usuario,
+                tipo=TransacaoChoices.DESPESA,
+                descricao='Despesa Registrada',
+                registrada_em=datetime.now(),
+                valor=float(despesa)
+            )
+
+            usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+            mensagem_enviar = (f'Despesa de R${transacao.valor} registrado com sucesso!\n')
+            return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+            
     
     def registrar_faturamento(self, usuario, text):
         mensagem_enviar = ''
@@ -180,9 +211,11 @@ class TelegramService():
             return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
         
     def exibir_gastos(self):
-        mensagem_enviar = f'Exibindo Gastos'
         TelegramClient.callback(self.callback_query_id)
-        TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+        
+        despesas = Transacao.objects.filter(tipo=TransacaoChoices.DESPESA, usuario=get_usuario(self.telegram_id))
+        return TelegramClient.enviar_mensagem(MensagemBot.mensagem_exibir_gastos(despesas, calcular_valor_total_despesas(despesas)), self.chat_id)
+        
 
     def menu_principal(self, usuario):
         usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
