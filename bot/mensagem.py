@@ -1,11 +1,6 @@
 from datetime import datetime
 class MensagemBot():
     @staticmethod
-    def mensagem_menu():    
-        return ('Olá! Como posso ajudar na sua gestão financeira hoje?\n\n'
-                'Escolha uma das opções abaixo para começar:')
-
-    @staticmethod
     def mensagem_exibir_gastos(despesas, valor_total):
         if not despesas.exists():
             return 'Você ainda não possui despesas cadastradas.'
@@ -19,3 +14,39 @@ class MensagemBot():
         
         mensagem_enviar += f'Valor Total: R${valor_total}'
         return mensagem_enviar
+    
+    '''
+    Monta o dicionário com a mensagem e os botões do menu
+    '''
+    @staticmethod
+    def mensagem_menu_principal():    
+        botoes = [
+            [
+                {
+                    "text": "Cadastrar Despesa",
+                    "callback_data": "despesa"
+                }
+            ],
+            [
+                {
+                    "text": "Cadastrar Faturamento",
+                    "callback_data": "faturamento"
+                }
+            ],
+            [
+                {
+                    "text": "Exibir Gastos",
+                    "callback_data": "gastos"
+                }
+            ]
+        ]
+
+        menu = {
+            'botoes': botoes,
+            'text': (
+                'Olá! Como posso ajudar na sua gestão financeira hoje?\n\n'
+                'Escolha uma das opções abaixo para começar:'
+            )
+        }   
+
+        return menu
