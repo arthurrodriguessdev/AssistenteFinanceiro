@@ -2,6 +2,7 @@ import requests
 from django.conf import settings
 from comum.models import Usuario, StatusUsuario, Transacao, TransacaoChoices
 from comum.services import *
+from comum.usuario_service import UsuarioService
 from mercadopago import services
 from bot.mensagem import MensagemBot
 from django.http import JsonResponse
@@ -9,6 +10,7 @@ from datetime import datetime
 
 URL_ENVIAR_MSG = f'{settings.URL_BASE_TELEGRAM}{settings.TOKEN_BOT}/sendMessage'
 URL_CONFIRMAR_CLIQUE_BOTAO = f'{settings.URL_BASE_TELEGRAM}{settings.TOKEN_BOT}/answerCallbackQuery'
+
 
 class TelegramClient():
     @staticmethod
@@ -84,8 +86,16 @@ class TelegramService():
         self.callback_query_id = callback_query_id
 
     def processar(self, acao=None):
-        if self.telegram_id is not None and not self.usuario_existe():
-            usuario = self.criar_usuario()
+        MensagemBot.mensagem_exibir_meses()
+        if self.telegram_id is not None and not UsuarioService.usuario_existe(self.telegram_id):
+            dados_usuario = {
+                'telegram_id': self.telegram_id,
+                'chat_id': self.chat_id,
+                'first_name': self.first_name,
+                'last_name': self.last_name
+            }
+
+            usuario = UsuarioService.criar_usuario(**dados_usuario)
             if usuario is not None:
                 return self.boas_vindas(usuario)
 
@@ -124,28 +134,6 @@ class TelegramService():
                 return self.menu_principal(usuario)
             else:
                 return self.boas_vindas(usuario)
-    
-    def usuario_existe(self):
-        return Usuario.objects.filter(telegram_id=self.telegram_id).exists()
-    
-    def usuario_esta_ativo(self):
-        return Usuario.objects.filter(telegram_id=self.telegram_id, ativo=True).exists()
-    
-    def criar_usuario(self):
-        novo_usuario = None
-
-        try:
-            novo_usuario = Usuario()
-            novo_usuario.telegram_id = self.telegram_id
-            novo_usuario.chat_id = self.chat_id
-            novo_usuario.nome = self.first_name
-            novo_usuario.sobrenome = self.last_name
-            novo_usuario.ativo = False
-            novo_usuario.save()
-            return novo_usuario
-
-        except:
-            return novo_usuario
     
     def boas_vindas(self, usuario):
         response = services.gerar_plano()

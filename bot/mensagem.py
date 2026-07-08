@@ -24,6 +24,19 @@ class MensagemBot():
         return mensagem_enviar 
 
     @staticmethod
+    def mensagem_exibir_meses():
+        MESES = [
+            'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ]
+
+        mensagem_enviar = 'Informe o número referente ao mês desejado para consulta:\n\n'
+        for numero, nome_mes in enumerate(MESES, 1):
+            mensagem_enviar += f'• {numero} - {nome_mes}\n'
+        
+        return mensagem_enviar
+
+    @staticmethod
     def mensagem_exibir_gastos(despesas, valor_total):
         if not despesas.exists():
             return (
