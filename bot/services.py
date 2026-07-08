@@ -137,30 +137,17 @@ class TelegramService():
         except Exception as e:
             return JsonResponse({'exception': e})
         
-        mensagem_enviar = (
-            f"Olá, {usuario.nome} {usuario.sobrenome}!\n\n"
-            "Seja bem-vindo ao Assistente Financeiro!\n\n"
-            "Com ele você poderá:\n"
-            "• Registrar receitas;\n"
-            "• Registrar despesas;\n"
-            "• Consultar seu saldo;\n"
-            "• Acompanhar sua vida financeira de forma simples e prática.\n\n"
-            "Percebi que este é o seu primeiro acesso. Para liberar o uso do assistente, "
-            "é necessário adquirir uma assinatura.\n\n"
-            f"-> Link para pagamento: {link_pagamento}\n"
-        ) 
-
-        TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+        TelegramClient.enviar_mensagem(MensagemBot.mensagem_boas_vindas(usuario, link_pagamento), self.chat_id)
     
     def registrar_despesa(self, usuario, text):
-        mensagem_enviar = f'Registrando Despesa'
+        mensagem_enviar = ''
         TelegramClient.callback(self.callback_query_id)
 
         if usuario.status == StatusUsuario.AGUARDANDO_MENU:
             usuario.set_status(StatusUsuario.AGUARDANDO_INFORMAR_VALOR_DESPESA)
         
         if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_VALOR_DESPESA:
-            mensagem_enviar = f'Informe o valor da despesa, por favor.'
+            mensagem_enviar = MensagemBot.mensagem_informar_valor(TransacaoChoices.DESPESA)
             return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
         
         if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_DESPESA:
@@ -178,7 +165,7 @@ class TelegramService():
                 valor=float(despesa)
             )
 
-            mensagem_enviar = f'Informe a descrição da despesa.'
+            mensagem_enviar = MensagemBot.mensagem_informar_descricao(TransacaoChoices.DESPESA)
             return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
         
         elif usuario.status == StatusUsuario.INFORMOU_DESPESA:
@@ -192,7 +179,10 @@ class TelegramService():
                 transacao.save()
 
                 usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
-                mensagem_enviar = (f'Despesa de R${transacao.valor} registrado com sucesso!\n')
+                mensagem_enviar = MensagemBot.mensagem_sucesso_registro(
+                    TransacaoChoices.DESPESA, 
+                    transacao.valor
+                )
                 return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
             
             except Exception as e:
@@ -209,15 +199,11 @@ class TelegramService():
             usuario.set_status(StatusUsuario.AGUARDANDO_INFORMAR_VALOR_FATURAMENTO)
 
         if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_VALOR_FATURAMENTO:
-            mensagem_enviar = (
-                f'Informe seu faturamento mensal. Exemplo válido: 1500.00\n'
-                f'OBS: Insira apenas o valor referente ao mês atual. Ele será adicionado ao saldo acumulado do período.'
-            )
-
+            mensagem_enviar = MensagemBot.mensagem_informar_valor(TransacaoChoices.FATURAMENTO)
             return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
         
         if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_FATURAMENTO:
-            mensagem_enviar = f'Bota a descrição filhote'
+            mensagem_enviar = MensagemBot.mensagem_informar_descricao(TransacaoChoices.FATURAMENTO)
             faturamento = str(text)
 
             if ',' in faturamento:
@@ -245,7 +231,10 @@ class TelegramService():
                 transacao.save()
 
                 usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
-                mensagem_enviar = (f'Faturamento de R${transacao.valor} registrado com sucesso!\n')
+                mensagem_enviar = MensagemBot.mensagem_sucesso_registro(
+                    TransacaoChoices.FATURAMENTO, 
+                    transacao.valor
+                )
                 return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
             
             except:
