@@ -35,7 +35,7 @@ class MensagemBot():
         for despesa in despesas:
             data = despesa.registrada_em
             mensagem_enviar += (
-                f'- {despesa.descricao}\n'
+                f'• {despesa.descricao}\n'
                 f'  Valor: R${despesa.valor}\n'
                 f'  Data: {data.strftime("%d/%m/%Y")} às {data.strftime("%H:%M")}\n\n'
             )
@@ -84,11 +84,26 @@ class MensagemBot():
         
         return mensagem_enviar
     
+    '''
+    Mensagens de erro
+    '''
     @staticmethod
     def mensagem_erro():
         return (
             "Ocorreu um erro inesperado ao processar sua solicitação.\n\n"
             "Tente novamente em alguns instantes."
+        )
+    
+    @staticmethod
+    def mensagem_erro_conversao_valor():
+        return (
+            "Valor inválido.\n\n"
+            "O registro foi cancelado e você voltou ao menu principal.\n"
+            "Clique novamente em <strong>Faturamento</strong> ou <strong>Despesa</strong> para iniciar um novo registro.\n\n"
+            "Exemplos válidos:\n"
+            "• 1500\n"
+            "• 1500,00\n"
+            "• 1500.00"
         )
     
     '''

@@ -1,7 +1,7 @@
 import requests
 from django.conf import settings
 from comum.models import Usuario, StatusUsuario, Transacao, TransacaoChoices
-from comum.services import get_usuario, calcular_valor_total_despesas
+from comum.services import *
 from mercadopago import services
 from bot.mensagem import MensagemBot
 from django.http import JsonResponse
@@ -14,8 +14,8 @@ class TelegramClient():
     @staticmethod
     def enviar_mensagem(text:str, chat_id:str):
         try:
-            json = {'chat_id': chat_id, 'text': text}
-            response = requests.post(URL_ENVIAR_MSG, json=json)
+            json = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
+            requests.post(URL_ENVIAR_MSG, json=json)
         except Exception as e:
             print(e)
     
@@ -174,10 +174,18 @@ class TelegramService():
             return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
         
         if usuario.status == configuracao['status_descricao']:
-            operacao = str(self.text)
+            valor_operacao = str(self.text)
 
-            if ',' in operacao:
-                operacao = operacao.replace(',', '.')
+            if ',' in valor_operacao:
+                valor_operacao = valor_operacao.replace(',', '.')
+            
+            valor_operacao = converter_valor_decimal(valor_operacao)
+
+            # Erro na conversão
+            if valor_operacao is None:
+                mensagem_enviar = MensagemBot.mensagem_erro_conversao_valor()
+                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
             
             # Registra o faturamento
             transacao = Transacao.objects.create(
@@ -185,7 +193,7 @@ class TelegramService():
                 tipo=tipo_transacao,
                 descricao='',
                 registrada_em=datetime.now(),
-                valor=float(operacao)
+                valor=float(valor_operacao)
             )
 
             mensagem_enviar = MensagemBot.mensagem_informar_descricao(tipo_transacao)
