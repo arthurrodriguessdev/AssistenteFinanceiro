@@ -84,6 +84,13 @@ class MensagemBot():
         
         return mensagem_enviar
     
+    @staticmethod
+    def mensagem_erro():
+        return (
+            "Ocorreu um erro inesperado ao processar sua solicitação.\n\n"
+            "Tente novamente em alguns instantes."
+        )
+    
     '''
     Monta o dicionário com a mensagem e os botões do menu
     '''
