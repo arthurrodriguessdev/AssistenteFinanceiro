@@ -1,12 +1,6 @@
 from comum.models import TransacaoChoices
+from bot import emojis
 
-
-# Emojis de mensagens
-EMOJI_ERRO = '❌'
-EMOJI_SUCESSO = '✅'
-EMOJI_ANOTACAO = '📝'
-EMOJI_DINHEIRO = '💰'
-EMOJI_DATA = '📅'
 
 class MensagemBot():
     """
@@ -58,9 +52,9 @@ class MensagemBot():
         for registro in registros:
             data = registro.registrada_em
             mensagem_enviar += (
-                f'{EMOJI_ANOTACAO} {registro.descricao}\n'
-                f'{EMOJI_DINHEIRO} Valor: R${registro.valor}\n'
-                f'{EMOJI_DATA} Data: {data.strftime("%d/%m/%Y")} às {data.strftime("%H:%M")}\n\n'
+                f'{emojis.EMOJI_ANOTACAO} {registro.descricao}\n'
+                f'{emojis.EMOJI_DINHEIRO} Valor: R${registro.valor}\n'
+                f'{emojis.EMOJI_DATA} Data: {data.strftime("%d/%m/%Y")} às {data.strftime("%H:%M")}\n\n'
             )
         
         mensagem_enviar += f'<strong>Valor Total:</strong> R${valor_total}'
@@ -98,11 +92,11 @@ class MensagemBot():
     def mensagem_sucesso_registro(tipo_transacao, valor):
         if tipo_transacao == TransacaoChoices.FATURAMENTO:
             mensagem_enviar = (
-                f'{EMOJI_SUCESSO} Faturamento registrado com sucesso.\n\n'
+                f'{emojis.EMOJI_SUCESSO} Faturamento registrado com sucesso.\n\n'
                 f'Valor: R${valor}')
         else:
             mensagem_enviar = (
-                f'{EMOJI_SUCESSO} Despesa registrado com sucesso.\n\n'
+                f'{emojis.EMOJI_SUCESSO} Despesa registrado com sucesso.\n\n'
                 f'Valor: R${valor}')
         
         return mensagem_enviar
@@ -113,14 +107,14 @@ class MensagemBot():
     @staticmethod
     def mensagem_erro():
         return (
-            f"{EMOJI_ERRO} Ocorreu um erro inesperado ao processar sua solicitação.\n\n"
+            f"{emojis.EMOJI_ERRO} Ocorreu um erro inesperado ao processar sua solicitação.\n\n"
             "Tente novamente em alguns instantes."
         )
     
     @staticmethod
     def mensagem_erro_conversao_valor():
         return (
-            f"{EMOJI_ERRO} Valor inválido.\n\n"
+            f"{emojis.EMOJI_ERRO} Valor inválido.\n\n"
             "O registro foi cancelado e você voltou ao menu principal.\n"
             "Clique novamente em <strong>Faturamento</strong> ou <strong>Despesa</strong> para iniciar um novo registro.\n\n"
             "Exemplos válidos:\n"
@@ -132,41 +126,33 @@ class MensagemBot():
     @staticmethod
     def mensagem_erro_numero_mes():
         return (
-            f'{EMOJI_ERRO} Número inválido.\n\n'
+            f'{emojis.EMOJI_ERRO} Número inválido.\n\n'
             'A operação foi cancelada e você voltou ao menu principal.\n'
             'Informe um número de <strong>0</strong> a <strong>12</strong> para selecionar o mês.'
         )
     
-    '''
-    Monta o dicionário com a mensagem e os botões do menu
-    '''
+    # Menus
     @staticmethod
     def mensagem_menu_principal():    
         botoes = [
             [
                 {
-                    "text": "Cadastrar Despesa",
-                    "callback_data": "despesa"
+                    "text": f"{emojis.EMOJI_DESPESA} Despesa",
+                    "callback_data": "menu_despesa"
                 }
             ],
             [
                 {
-                    "text": "Cadastrar Faturamento",
-                    "callback_data": "faturamento"
+                    "text": f"{emojis.EMOJI_FATURAMENTO} Faturamento",
+                    "callback_data": "menu_faturamento"
                 }
             ],
             [
                 {
-                    "text": "Exibir Gastos",
-                    "callback_data": "exibir_gastos"
+                    "text": f"{emojis.EMOJI_RELATORIO} Relatórios",
+                    "callback_data": "menu_relatorio"
                 }
             ],
-            [
-                {
-                    "text": "Exibir Faturamento",
-                    "callback_data": "exibir_faturamento"
-                }
-            ]
         ]
 
         menu = {
@@ -174,6 +160,75 @@ class MensagemBot():
             'text': (
                 'Olá! Como posso ajudar na sua gestão financeira hoje?\n\n'
                 'Escolha uma das opções abaixo para começar:'
+            )
+        }   
+
+        return menu
+
+    @staticmethod
+    def mensagem_menu_faturamento():    
+        botoes = [
+            [
+                {
+                    "text": "Cadastrar Faturamento",
+                    "callback_data": "cadastro_faturamento"
+                }
+            ],
+        ]
+
+        menu = {
+            'botoes': botoes,
+            'text': (
+                f'{emojis.EMOJI_FATURAMENTO} Faturamento\n\n'
+                'O que você deseja fazer?'
+            )
+        }   
+
+        return menu
+    
+    @staticmethod
+    def mensagem_menu_despesa():    
+        botoes = [
+            [
+                {
+                    "text": "Cadastrar Despesa",
+                    "callback_data": "cadastro_despesa"
+                }
+            ],
+        ]
+
+        menu = {
+            'botoes': botoes,
+            'text': (
+                f'{emojis.EMOJI_DESPESA} Despesa\n\n'
+                'O que você deseja fazer?'
+            )
+        }   
+
+        return menu
+    
+    @staticmethod
+    def mensagem_menu_relatorio():    
+        botoes = [
+            [
+                {
+                    "text": "Exibir Despesas",
+                    "callback_data": "exibir_despesas"
+                }
+            ],
+            [
+                {
+                    "text": "Exibir Faturamentos",
+                    "callback_data": "exibir_faturamentos"
+                }
+            ],
+        ]
+
+        menu = {
+            'botoes': botoes,
+            'text': (
+                f'{emojis.EMOJI_RELATORIO} Relatórios\n\n'
+                'O que você deseja fazer?'
             )
         }   
 

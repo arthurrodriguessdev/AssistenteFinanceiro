@@ -13,6 +13,13 @@ URL_ENVIAR_MSG = f'{settings.URL_BASE_TELEGRAM}{settings.TOKEN_BOT}/sendMessage'
 URL_CONFIRMAR_CLIQUE_BOTAO = f'{settings.URL_BASE_TELEGRAM}{settings.TOKEN_BOT}/answerCallbackQuery'
 
 
+class TipoMenu():
+    PRINCIPAL = 'principal'
+    FATURAMENTO = 'faturamento'
+    DESPESA = 'despesa'
+    RELATORIO = 'relatorio'
+
+
 class TelegramClient():
     @staticmethod
     def enviar_mensagem(text:str, chat_id:str):
@@ -27,7 +34,7 @@ class TelegramClient():
         try:
             json = {
                 'chat_id': chat_id,
-                'text': text,
+                'text': text if text != '' else '',
                 'reply_markup':{
                     'inline_keyboard':botoes
                 }
@@ -103,16 +110,25 @@ class TelegramService():
         usuario = get_usuario(self.telegram_id)
         if acao is not None and self.callback_query_id is not None:
             if usuario is not None:
-                if acao == 'despesa': 
+                if acao == 'menu_despesa': 
+                    return self.menu(usuario, TipoMenu.DESPESA)
+                
+                elif acao == 'menu_faturamento':
+                    return self.menu(usuario, TipoMenu.FATURAMENTO)
+                
+                elif acao == 'menu_relatorio':
+                    return self.menu(usuario, TipoMenu.RELATORIO)
+                
+                elif acao == 'cadastro_despesa':
                     return self.registrar_transacao(TransacaoChoices.DESPESA, usuario)
                 
-                elif acao == 'faturamento': 
+                elif acao == 'cadastro_faturamento': 
                     return self.registrar_transacao(TransacaoChoices.FATURAMENTO, usuario)
                 
-                elif acao == 'exibir_gastos': 
+                elif acao == 'exibir_despesas': 
                     return self.exibir(TransacaoChoices.DESPESA, usuario)
                 
-                elif acao == 'exibir_faturamento':
+                elif acao == 'exibir_faturamentos':
                     return self.exibir(TransacaoChoices.FATURAMENTO, usuario)
         else:
             if usuario:
@@ -146,7 +162,7 @@ class TelegramService():
                     usuario.set_status(StatusUsuario.AGUARDANDO_VER_FATURAMENTO)
                     return self.exibir(TransacaoChoices.FATURAMENTO, usuario)
                 
-                return self.menu_principal(usuario)
+                return self.menu(usuario, TipoMenu.PRINCIPAL)
                 
             else:
                 return self.boas_vindas(usuario)
@@ -161,11 +177,13 @@ class TelegramService():
         
         TelegramClient.enviar_mensagem(MensagemBot.mensagem_boas_vindas(usuario, link_pagamento), self.chat_id)
     
-    ''' Método que registra todas as transações aceitas pelo sistema:
+    def registrar_transacao(self, tipo_transacao, usuario):
+        """ 
+        Método que registra todas as transações aceitas pelo sistema:
         - Faturamento
         - Despesa
-    '''
-    def registrar_transacao(self, tipo_transacao, usuario):
+        """
+
         configuracao = self.TRANSACAO_CONFIG[tipo_transacao]
         mensagem_enviar = ''
         TelegramClient.callback(self.callback_query_id)
@@ -243,8 +261,18 @@ class TelegramService():
         elif status and status == 'erro':
             msg_erro = MensagemBot.mensagem_erro_numero_mes()
             return TelegramClient.enviar_mensagem(msg_erro, self.chat_id)
-        
-    def menu_principal(self, usuario):
+    
+    def menu(self, usuario, tipo_menu):
         usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
-        menu = MensagemBot.mensagem_menu_principal()
+        menu = None
+
+        if tipo_menu == TipoMenu.PRINCIPAL:
+            menu = MensagemBot.mensagem_menu_principal()
+        elif tipo_menu == TipoMenu.FATURAMENTO:
+            menu = MensagemBot.mensagem_menu_faturamento()
+        elif tipo_menu == TipoMenu.DESPESA:
+            menu = MensagemBot.mensagem_menu_despesa()
+        elif tipo_menu == TipoMenu.RELATORIO:
+            menu = MensagemBot.mensagem_menu_relatorio()
+
         TelegramClient.enviar_mensagens_botoes(menu['text'], self.chat_id, menu['botoes'])
