@@ -15,6 +15,13 @@ class StatusUsuario(models.IntegerChoices):
     AGUARDANDO_INFORMAR_VALOR_DESPESA = 6, "Aguardando Informar Despesa"
     AGUARDANDO_INFORMAR_DESCRICAO_DESPESA = 7, "Aguardando Informar Descrição Despesa"
     INFORMOU_DESPESA = 8, "Informou Despesa"
+
+    # Relatórios
+    AGUARDANDO_INFORMAR_MES_DESPESA = 9, 'Aguardando Informar Mês Despesa'
+    AGUARDANDO_INFORMAR_MES_FATURAMENTO = 10, 'Aguardando Informar Mês Faturamento'
+
+    AGUARDANDO_VER_DESPESA = 11, 'Aguardando Visualizar Despesa'
+    AGUARDANDO_VER_FATURAMENTO = 12, 'Aguardando Visualizar Faturamento'
     
 
 class TransacaoChoices(models.IntegerChoices):

@@ -5,6 +5,7 @@ from comum.services import *
 from comum.usuario_service import UsuarioService
 from mercadopago import services
 from bot.mensagem import MensagemBot
+from bot.relatorios import Relatorio
 from django.http import JsonResponse
 from datetime import datetime
 
@@ -104,34 +105,49 @@ class TelegramService():
             if usuario is not None:
                 if acao == 'despesa': 
                     return self.registrar_transacao(TransacaoChoices.DESPESA, usuario)
+                
                 elif acao == 'faturamento': 
                     return self.registrar_transacao(TransacaoChoices.FATURAMENTO, usuario)
-                elif acao == 'gastos': 
-                    return self.exibir_gastos()
+                
+                elif acao == 'exibir_gastos': 
+                    return self.exibir(TransacaoChoices.DESPESA, usuario)
+                
+                elif acao == 'exibir_faturamento':
+                    return self.exibir(TransacaoChoices.FATURAMENTO, usuario)
         else:
             if usuario:
 
                 # Faturamento
-                enviou_despesa_faturamento = self.text is not None
-                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_VALOR_FATURAMENTO and                    enviou_despesa_faturamento:
+                msg_usuario = self.text is not None
+                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_VALOR_FATURAMENTO and                    msg_usuario:
                     usuario.set_status(StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_FATURAMENTO)
                     return self.registrar_transacao(TransacaoChoices.FATURAMENTO, usuario)
                 
-                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_FATURAMENTO and enviou_despesa_faturamento:
+                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_FATURAMENTO and msg_usuario:
                     usuario.set_status(StatusUsuario.INFORMOU_FATURAMENTO)
                     return self.registrar_transacao(TransacaoChoices.FATURAMENTO, usuario)
                 
                 # Despesa
-                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_VALOR_DESPESA and enviou_despesa_faturamento:
+                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_VALOR_DESPESA and msg_usuario:
                     usuario.set_status(StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_DESPESA)
                     return self.registrar_transacao(TransacaoChoices.DESPESA, usuario)
                 
-                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_DESPESA and enviou_despesa_faturamento:
+                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_DESPESA and msg_usuario:
                     usuario.set_status(StatusUsuario.INFORMOU_DESPESA)
                     return self.registrar_transacao(TransacaoChoices.DESPESA, usuario)
+            
+                # Exibição de Gastos
+                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_MES_DESPESA and msg_usuario:
+                    usuario.set_status(StatusUsuario.AGUARDANDO_VER_DESPESA)
+                    return self.exibir(TransacaoChoices.DESPESA, usuario)
+            
+                # Exibição de Faturamento
+                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_MES_FATURAMENTO and msg_usuario:
+                    usuario.set_status(StatusUsuario.AGUARDANDO_VER_FATURAMENTO)
+                    return self.exibir(TransacaoChoices.FATURAMENTO, usuario)
                 
-                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
                 return self.menu_principal(usuario)
+                
             else:
                 return self.boas_vindas(usuario)
     
@@ -209,11 +225,24 @@ class TelegramService():
                 usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
                 return TelegramClient.enviar_mensagem("Deu erro ao salvar", self.chat_id)
 
-    def exibir_gastos(self):
+    def exibir(self, tipo_registro, usuario):
         TelegramClient.callback(self.callback_query_id)
+
+        exibir = Relatorio.exibir(usuario, self.text, tipo_registro)
+        status = exibir.get('status', None)
+        if status and status == 'mostrar_meses':
+            return TelegramClient.enviar_mensagem(MensagemBot.mensagem_exibir_meses(), self.chat_id)
         
-        despesas = Transacao.objects.filter(tipo=TransacaoChoices.DESPESA, usuario=get_usuario(self.telegram_id))
-        return TelegramClient.enviar_mensagem(MensagemBot.mensagem_exibir_gastos(despesas, calcular_valor_total_despesas(despesas)), self.chat_id)
+        elif status and status == 'mostrar_registros':
+            registros = exibir.get('registros', None)
+            total = exibir.get('valor_total', None)
+
+            msg_gastos = MensagemBot.mensagem_exibir_registros(registros, total, tipo_registro)
+            return TelegramClient.enviar_mensagem(msg_gastos, self.chat_id)
+        
+        elif status and status == 'erro':
+            msg_erro = MensagemBot.mensagem_erro_numero_mes()
+            return TelegramClient.enviar_mensagem(msg_erro, self.chat_id)
         
     def menu_principal(self, usuario):
         usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
