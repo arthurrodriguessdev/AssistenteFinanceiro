@@ -1,13 +1,17 @@
 import requests
 from django.conf import settings
-from comum.models import Usuario, StatusUsuario, Transacao, TransacaoChoices
+from comum.models import StatusUsuario, Transacao, TransacaoChoices
 from comum.services import *
 from comum.usuario_service import UsuarioService
 from mercadopago import services
 from bot.mensagem import MensagemBot
 from bot.relatorios import Relatorio
+from bot.transacoes import TransacaoService
 from django.http import JsonResponse
-from datetime import datetime
+from django.core.exceptions import ValidationError
+import logging
+
+logger = logging.getLogger(__name__)
 
 URL_ENVIAR_MSG = f'{settings.URL_BASE_TELEGRAM}{settings.TOKEN_BOT}/sendMessage'
 URL_CONFIRMAR_CLIQUE_BOTAO = f'{settings.URL_BASE_TELEGRAM}{settings.TOKEN_BOT}/answerCallbackQuery'
@@ -125,47 +129,78 @@ class TelegramService():
                 elif acao == 'cadastro_faturamento': 
                     return self.registrar_transacao(TransacaoChoices.FATURAMENTO, usuario)
                 
+                elif acao == 'exclusao_despesa':
+                    return self.excluir_transacao(TransacaoChoices.DESPESA, usuario)
+                
+                elif acao == 'exclusao_faturamento': 
+                    return self.excluir_transacao(TransacaoChoices.FATURAMENTO, usuario)
+                
                 elif acao == 'exibir_despesas': 
                     return self.exibir(TransacaoChoices.DESPESA, usuario)
                 
                 elif acao == 'exibir_faturamentos':
                     return self.exibir(TransacaoChoices.FATURAMENTO, usuario)
-        else:
-            if usuario:
+        if usuario:
 
-                # Faturamento
-                msg_usuario = self.text is not None
-                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_VALOR_FATURAMENTO and                    msg_usuario:
-                    usuario.set_status(StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_FATURAMENTO)
-                    return self.registrar_transacao(TransacaoChoices.FATURAMENTO, usuario)
-                
-                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_FATURAMENTO and msg_usuario:
-                    usuario.set_status(StatusUsuario.INFORMOU_FATURAMENTO)
-                    return self.registrar_transacao(TransacaoChoices.FATURAMENTO, usuario)
-                
-                # Despesa
-                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_VALOR_DESPESA and msg_usuario:
-                    usuario.set_status(StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_DESPESA)
-                    return self.registrar_transacao(TransacaoChoices.DESPESA, usuario)
-                
-                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_DESPESA and msg_usuario:
-                    usuario.set_status(StatusUsuario.INFORMOU_DESPESA)
-                    return self.registrar_transacao(TransacaoChoices.DESPESA, usuario)
+            # Cadastro de Faturamento
+            msg_usuario = self.text is not None
+            if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_VALOR_FATURAMENTO and msg_usuario:
+                usuario.set_status(StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_FATURAMENTO)
+                return self.registrar_transacao(TransacaoChoices.FATURAMENTO, usuario)
             
-                # Exibição de Gastos
-                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_MES_DESPESA and msg_usuario:
-                    usuario.set_status(StatusUsuario.AGUARDANDO_VER_DESPESA)
-                    return self.exibir(TransacaoChoices.DESPESA, usuario)
+            if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_FATURAMENTO and msg_usuario:
+                usuario.set_status(StatusUsuario.INFORMOU_FATURAMENTO)
+                return self.registrar_transacao(TransacaoChoices.FATURAMENTO, usuario)
             
-                # Exibição de Faturamento
-                if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_MES_FATURAMENTO and msg_usuario:
-                    usuario.set_status(StatusUsuario.AGUARDANDO_VER_FATURAMENTO)
-                    return self.exibir(TransacaoChoices.FATURAMENTO, usuario)
-                
-                return self.menu(usuario, TipoMenu.PRINCIPAL)
-                
-            else:
-                return self.boas_vindas(usuario)
+            # Cadastro de Despesa
+            if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_VALOR_DESPESA and msg_usuario:
+                usuario.set_status(StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_DESPESA)
+                return self.registrar_transacao(TransacaoChoices.DESPESA, usuario)
+            
+            if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_DESPESA and msg_usuario:
+                usuario.set_status(StatusUsuario.INFORMOU_DESPESA)
+                return self.registrar_transacao(TransacaoChoices.DESPESA, usuario)
+        
+            # Exibição de Gastos
+            if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_MES_DESPESA and msg_usuario:
+                usuario.set_status(StatusUsuario.AGUARDANDO_VER_DESPESA)
+                return self.exibir(TransacaoChoices.DESPESA, usuario)
+        
+            # Exibição de Faturamento
+            if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_MES_FATURAMENTO and msg_usuario:
+                usuario.set_status(StatusUsuario.AGUARDANDO_VER_FATURAMENTO)
+                return self.exibir(TransacaoChoices.FATURAMENTO, usuario)
+            
+            # Exclusão de Despesa
+            if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_MES_DESPESA_EXCLUSAO and msg_usuario:
+                usuario.set_status(StatusUsuario.AGUARDANDO_VER_DESPESA_EXCLUSAO)
+                return self.excluir_transacao(TransacaoChoices.DESPESA, usuario)
+
+            if usuario.status == StatusUsuario.AGUARDANDO_VER_DESPESA_EXCLUSAO:
+                usuario.set_status(StatusUsuario.AGUARDANDO_CONFIRMAR_EXCLUSAO_DESPESA)
+                return self.excluir_transacao(TransacaoChoices.DESPESA, usuario, acao)
+            
+            if usuario.status == StatusUsuario.AGUARDANDO_CONFIRMAR_EXCLUSAO_DESPESA:
+                usuario.set_status(StatusUsuario.CONFIRMOU_CANCELOU_EXCLUSAO_DESPESA)
+                return self.excluir_transacao(TransacaoChoices.DESPESA, usuario, acao)
+            
+            # Exclusão de Faturamento
+            if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_MES_FATURAMENTO_EXCLUSAO and msg_usuario:
+                usuario.set_status(StatusUsuario.AGUARDANDO_VER_FATURAMENTO_EXCLUSAO)
+                return self.excluir_transacao(TransacaoChoices.FATURAMENTO, usuario)
+
+            if usuario.status == StatusUsuario.AGUARDANDO_VER_FATURAMENTO_EXCLUSAO:
+                usuario.set_status(StatusUsuario.AGUARDANDO_CONFIRMAR_EXCLUSAO_FATURAMENTO)
+                return self.excluir_transacao(TransacaoChoices.FATURAMENTO, usuario, acao)
+            
+            if usuario.status == StatusUsuario.AGUARDANDO_CONFIRMAR_EXCLUSAO_FATURAMENTO:
+                usuario.set_status(StatusUsuario.CONFIRMOU_CANCELOU_EXCLUSAO_FATURAMENTO)
+                return self.excluir_transacao(TransacaoChoices.FATURAMENTO, usuario, acao)
+
+            return self.menu(usuario, TipoMenu.PRINCIPAL)
+            
+        else:
+            return self.boas_vindas(usuario)
     
     def boas_vindas(self, usuario):
         response = services.gerar_plano()
@@ -186,7 +221,7 @@ class TelegramService():
 
         configuracao = self.TRANSACAO_CONFIG[tipo_transacao]
         mensagem_enviar = ''
-        TelegramClient.callback(self.callback_query_id)
+        self.callback()
 
         if usuario.status == StatusUsuario.AGUARDANDO_MENU:
             usuario.set_status(configuracao['status_valor'])
@@ -209,14 +244,34 @@ class TelegramService():
                 usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
                 return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
             
-            # Registra o faturamento
-            transacao = Transacao.objects.create(
+            # Valida número negativo
+            if valor_operacao <= 0:
+                mensagem_enviar = MensagemBot.mensagem_erro_valor_negativo()
+                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+            
+            transacao = Transacao(
                 usuario=usuario,
                 tipo=tipo_transacao,
                 descricao='',
-                registrada_em=datetime.now(),
-                valor=float(valor_operacao)
+                valor=valor_operacao
             )
+
+            # Registra o faturamento
+            try:
+                transacao.full_clean()
+                transacao.save()
+
+            except ValidationError as e:
+                logger.exception("Erro no registro de transação.")
+                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+
+                if "valor" in e.message_dict:
+                    mensagem_enviar = mensagem_enviar = MensagemBot.mensagem_erro_tamanho_valor()
+                else:
+                    mensagem_enviar = MensagemBot.mensagem_erro()
+
+                return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
 
             mensagem_enviar = MensagemBot.mensagem_informar_descricao(tipo_transacao)
             return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
@@ -239,12 +294,14 @@ class TelegramService():
 
                 return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
             
-            except Exception as e:
+            except Exception:
+                logger.exception("Erro no registro de transação.")
                 usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
-                return TelegramClient.enviar_mensagem("Deu erro ao salvar", self.chat_id)
+                mensagem_enviar = MensagemBot.mensagem_erro()
+                return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
 
     def exibir(self, tipo_registro, usuario):
-        TelegramClient.callback(self.callback_query_id)
+        self.callback()
 
         exibir = Relatorio.exibir(usuario, self.text, tipo_registro)
         status = exibir.get('status', None)
@@ -261,6 +318,43 @@ class TelegramService():
         elif status and status == 'erro':
             msg_erro = MensagemBot.mensagem_erro_numero_mes()
             return TelegramClient.enviar_mensagem(msg_erro, self.chat_id)
+    
+    def excluir_transacao(self, tipo_registro, usuario, acao=None):
+        self.callback()
+
+        excluir = TransacaoService.excluir_registro(tipo_registro, usuario, self.text, acao)
+        status = excluir.get('status', None)
+
+        if status and status == 'mostrar_meses':
+            mensagem_enviar = MensagemBot.mensagem_exibir_meses()
+            return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+
+        elif status and status == 'mostrar_registros':
+            registros = excluir.get('registros', None)
+            mensagem_enviar = MensagemBot.mensagem_exibir_registros_exclusao(registros, tipo_registro)
+            return TelegramClient.enviar_mensagens_botoes(mensagem_enviar['text'], self.chat_id, mensagem_enviar['botoes'])
+
+        elif status and status == 'mostrar_confirmacao':
+            registro_excluir = excluir.get('registro_excluir', None)
+            mensagem_enviar = MensagemBot.mensagem_confirmar_exclusao(registro_excluir)
+            return TelegramClient.enviar_mensagens_botoes(mensagem_enviar['text'], self.chat_id, mensagem_enviar['botoes'])
+        
+        elif status and status == 'mostrar_mensagem_excluiu_sucesso':
+            mensagem_enviar = MensagemBot.mensagem_exclusao_confirmada(tipo_registro)
+            return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+        
+        elif status and status == 'mostrar_mensagem_cancelou_operacao':
+            mensagem_enviar = MensagemBot.mensagem_exclusao_cancelada(tipo_registro)
+            return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+        
+        elif status and status == 'erro':
+            mensagem_enviar = MensagemBot.mensagem_erro_numero_mes()
+            return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+
+    def callback(self):
+        if self.callback_query_id is not None:
+            return TelegramClient.callback(self.callback_query_id)
+        return None
     
     def menu(self, usuario, tipo_menu):
         usuario.set_status(StatusUsuario.AGUARDANDO_MENU)

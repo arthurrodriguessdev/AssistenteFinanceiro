@@ -11,17 +11,27 @@ class StatusUsuario(models.IntegerChoices):
     AGUARDANDO_INFORMAR_DESCRICAO_FATURAMENTO = 4, "Aguardando Informar Descrição Faturamento"
     INFORMOU_FATURAMENTO = 5, "Informou Despesa"
 
+    AGUARDANDO_INFORMAR_MES_FATURAMENTO_EXCLUSAO = 6, 'Aguardando Informar Mês Faturamento Exclusão'
+    AGUARDANDO_CONFIRMAR_EXCLUSAO_FATURAMENTO = 15, 'Aguardando Confirmar Exclusão Faturamento'
+    AGUARDANDO_VER_FATURAMENTO_EXCLUSAO = 17, 'Aguardando Visualizar Faturamento Exclusão'
+    CONFIRMOU_CANCELOU_EXCLUSAO_FATURAMENTO = 20, 'Confirmou ou Cancelou Exclusão Faturamento'
+
     # Despesa
-    AGUARDANDO_INFORMAR_VALOR_DESPESA = 6, "Aguardando Informar Despesa"
-    AGUARDANDO_INFORMAR_DESCRICAO_DESPESA = 7, "Aguardando Informar Descrição Despesa"
-    INFORMOU_DESPESA = 8, "Informou Despesa"
+    AGUARDANDO_INFORMAR_VALOR_DESPESA = 7, "Aguardando Informar Despesa"
+    AGUARDANDO_INFORMAR_DESCRICAO_DESPESA = 8, "Aguardando Informar Descrição Despesa"
+    INFORMOU_DESPESA = 9, "Informou Despesa"
+
+    AGUARDANDO_INFORMAR_MES_DESPESA_EXCLUSAO = 10, 'Aguardando Informar Mês Despesa Exclusão'
+    AGUARDANDO_CONFIRMAR_EXCLUSAO_DESPESA = 16, 'Aguardando Confirmar Exclusão Despesa'
+    AGUARDANDO_VER_DESPESA_EXCLUSAO = 18, 'Aguardando Visualizar Despesa Exclusão'
+    CONFIRMOU_CANCELOU_EXCLUSAO_DESPESA = 19, 'Confirmou ou Cancelou Exclusão Despesa'
 
     # Relatórios
-    AGUARDANDO_INFORMAR_MES_DESPESA = 9, 'Aguardando Informar Mês Despesa'
-    AGUARDANDO_INFORMAR_MES_FATURAMENTO = 10, 'Aguardando Informar Mês Faturamento'
+    AGUARDANDO_INFORMAR_MES_DESPESA = 11, 'Aguardando Informar Mês Despesa'
+    AGUARDANDO_INFORMAR_MES_FATURAMENTO = 12, 'Aguardando Informar Mês Faturamento'
 
-    AGUARDANDO_VER_DESPESA = 11, 'Aguardando Visualizar Despesa'
-    AGUARDANDO_VER_FATURAMENTO = 12, 'Aguardando Visualizar Faturamento'
+    AGUARDANDO_VER_DESPESA = 13, 'Aguardando Visualizar Despesa'
+    AGUARDANDO_VER_FATURAMENTO = 14, 'Aguardando Visualizar Faturamento'
     
 
 class TransacaoChoices(models.IntegerChoices):
@@ -57,7 +67,7 @@ class Usuario(models.Model):
 class Transacao(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='transacoes')
     tipo = models.IntegerField(choices=TransacaoChoices)
-    descricao = models.CharField(max_length=250)
+    descricao = models.CharField(max_length=250, blank=True)
     registrada_em = models.DateTimeField(auto_now_add=True)
     valor = models.DecimalField(decimal_places=2, max_digits=10)
 

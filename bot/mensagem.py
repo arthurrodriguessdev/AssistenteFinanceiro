@@ -52,7 +52,7 @@ class MensagemBot():
         for registro in registros:
             data = registro.registrada_em
             mensagem_enviar += (
-                f'{emojis.EMOJI_ANOTACAO} {registro.descricao}\n'
+                f'{emojis.EMOJI_ANOTACAO} {registro.descricao.capitalize()}\n'
                 f'{emojis.EMOJI_DINHEIRO} Valor: R${registro.valor}\n'
                 f'{emojis.EMOJI_DATA} Data: {data.strftime("%d/%m/%Y")} às {data.strftime("%H:%M")}\n\n'
             )
@@ -60,6 +60,73 @@ class MensagemBot():
         mensagem_enviar += f'<strong>Valor Total:</strong> R${valor_total}'
         return mensagem_enviar
     
+    @staticmethod
+    def mensagem_exibir_registros_exclusao(registros, tipo_registro):
+        tipo = 'despesa' if tipo_registro == TransacaoChoices.DESPESA else 'faturamento'
+
+        if not registros:
+            return (
+                f'Nenhum registro de {tipo} foi encontrado.\n\n'
+                f'Utilize a opção "Cadastrar {tipo.capitalize()}" no menu principal para realizar o primeiro registro.'
+            )
+        
+        mensagem_enviar = 'Selecione a despesa a ser excluída:\n\n' if tipo == 'despesa' else 'Selecione o faturamento a ser excluído:\n\n'
+        botoes = []
+        for registro in registros:
+            data = registro.registrada_em
+            mensagem_enviar += (
+                f'{emojis.EMOJI_ANOTACAO} {registro.descricao.capitalize()}\n'
+                f'{emojis.EMOJI_DINHEIRO} Valor: R${registro.valor}\n'
+                f'{emojis.EMOJI_DATA} Data: {data.strftime("%d/%m/%Y")} às {data.strftime("%H:%M")}\n\n'
+            )
+
+            botoes.append([
+                {
+                    "text": f"{emojis.EMOJI_LIXEIRA} {registro.descricao.capitalize()}",
+                    "callback_data": f"remover_{registro.id}"
+                }
+            ])
+        
+        return {'text': mensagem_enviar, 'botoes': botoes}
+
+    @staticmethod
+    def mensagem_confirmar_exclusao(registro):
+        tipo = 'despesa' if registro.tipo == TransacaoChoices.DESPESA else 'faturamento'
+        data = registro.registrada_em
+        mensagem_enviar = (
+            f'Tem certeza que deseja excluir o registro de {tipo} abaixo?\n\n'
+            f'{emojis.EMOJI_ANOTACAO} {registro.descricao.capitalize()}\n'
+            f'{emojis.EMOJI_DINHEIRO} Valor: R${registro.valor}\n'
+            f'{emojis.EMOJI_DATA} Data: {data.strftime("%d/%m/%Y")} às {data.strftime("%H:%M")}\n\n'
+        )
+
+        botoes = []
+        botoes.append([
+            {
+                "text": f"{emojis.EMOJI_SUCESSO} Confirmar",
+                "callback_data": f"confirmar_{registro.pk}"
+            }
+        ])
+
+        botoes.append([
+            {
+                "text": f"{emojis.EMOJI_ERRO} Cancelar",
+                "callback_data": "cancelar"
+            }
+        ])
+
+        return {'text': mensagem_enviar, 'botoes': botoes}
+
+    @staticmethod
+    def mensagem_exclusao_confirmada(tipo_registro):
+        tipo = 'despesa' if tipo_registro == TransacaoChoices.DESPESA else 'faturamento'
+        return (f'{emojis.EMOJI_SUCESSO} O registro de {tipo} foi excluído com sucesso!')
+    
+    @staticmethod
+    def mensagem_exclusao_cancelada(tipo_registro):
+        tipo = 'despesa' if tipo_registro == TransacaoChoices.DESPESA else 'faturamento'
+        return (f'{emojis.EMOJI_ERRO} A exclusão do registro de {tipo} foi cancelada.')
+        
     @staticmethod
     def mensagem_informar_valor(tipo_transacao):
         if tipo_transacao == TransacaoChoices.FATURAMENTO:
@@ -122,7 +189,26 @@ class MensagemBot():
             "• 1500,00\n"
             "• 1500.00"
         )
+
+    @staticmethod
+    def mensagem_erro_valor_negativo():
+        return (
+            f"{emojis.EMOJI_ERRO} Valor inválido. Apenas valores positivos são aceitos.\n\n"
+            "O registro foi cancelado e você voltou ao menu principal.\n"
+            "Clique novamente em <strong>Faturamento</strong> ou <strong>Despesa</strong> para iniciar um novo registro.\n\n"
+            "Exemplos válidos:\n"
+            "• 1500\n"
+            "• 1500,00\n"
+            "• 1500.00"
+        )
     
+    @staticmethod
+    def mensagem_erro_tamanho_valor():
+        return (
+            f"{emojis.EMOJI_ERRO} O valor informado é muito grande.\n\n"
+            "O máximo permitido é R$ 99.999.999,99."
+        )
+
     @staticmethod
     def mensagem_erro_numero_mes():
         return (
@@ -174,6 +260,12 @@ class MensagemBot():
                     "callback_data": "cadastro_faturamento"
                 }
             ],
+            [
+                {
+                    "text": "Excluir Faturamento",
+                    "callback_data": "exclusao_faturamento"
+                }
+            ],
         ]
 
         menu = {
@@ -193,6 +285,12 @@ class MensagemBot():
                 {
                     "text": "Cadastrar Despesa",
                     "callback_data": "cadastro_despesa"
+                }
+            ],
+            [
+                {
+                    "text": "Excluir Despesa",
+                    "callback_data": "exclusao_despesa"
                 }
             ],
         ]
