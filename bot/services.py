@@ -112,34 +112,25 @@ class TelegramService():
                 return self.boas_vindas(usuario)
 
         usuario = get_usuario(self.telegram_id)
+
+        acoes_sistema = {
+            'menu_despesa': lambda: self.menu(usuario, TipoMenu.DESPESA),
+            'menu_faturamento': lambda: self.menu(usuario, TipoMenu.FATURAMENTO),
+            'menu_relatorio': lambda: self.menu(usuario, TipoMenu.RELATORIO),
+            'cadastro_despesa': lambda: self.registrar_transacao(TransacaoChoices.DESPESA, usuario),
+            'cadastro_faturamento': lambda: self.registrar_transacao(TransacaoChoices.FATURAMENTO, usuario),
+            'exclusao_despesa': lambda: self.excluir_transacao(TransacaoChoices.DESPESA, usuario),
+            'exclusao_faturamento': lambda: self.excluir_transacao(TransacaoChoices.FATURAMENTO, usuario),
+            'exibir_despesas':  lambda: self.exibir(TransacaoChoices.DESPESA, usuario),
+            'exibir_faturamentos': lambda: self.exibir(TransacaoChoices.FATURAMENTO, usuario)
+        }
+
         if acao is not None and self.callback_query_id is not None:
             if usuario is not None:
-                if acao == 'menu_despesa': 
-                    return self.menu(usuario, TipoMenu.DESPESA)
-                
-                elif acao == 'menu_faturamento':
-                    return self.menu(usuario, TipoMenu.FATURAMENTO)
-                
-                elif acao == 'menu_relatorio':
-                    return self.menu(usuario, TipoMenu.RELATORIO)
-                
-                elif acao == 'cadastro_despesa':
-                    return self.registrar_transacao(TransacaoChoices.DESPESA, usuario)
-                
-                elif acao == 'cadastro_faturamento': 
-                    return self.registrar_transacao(TransacaoChoices.FATURAMENTO, usuario)
-                
-                elif acao == 'exclusao_despesa':
-                    return self.excluir_transacao(TransacaoChoices.DESPESA, usuario)
-                
-                elif acao == 'exclusao_faturamento': 
-                    return self.excluir_transacao(TransacaoChoices.FATURAMENTO, usuario)
-                
-                elif acao == 'exibir_despesas': 
-                    return self.exibir(TransacaoChoices.DESPESA, usuario)
-                
-                elif acao == 'exibir_faturamentos':
-                    return self.exibir(TransacaoChoices.FATURAMENTO, usuario)
+                acao_realizar = acoes_sistema.get(acao)
+                if acao_realizar:
+                    return acao_realizar()
+            
         if usuario:
 
             # Cadastro de Faturamento
