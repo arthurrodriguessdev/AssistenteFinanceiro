@@ -1,5 +1,6 @@
 from comum.models import TransacaoChoices
 from bot import emojis
+from bot.enums.enums import TipoAcao
 from comum.services import get_meses_ano
 
 
@@ -35,7 +36,7 @@ class MensagemBot():
         for numero, nome in enumerate(MESES):
             linha.append({
                 'text': nome,
-                'callback_data': f'mes_{numero}'
+                'callback_data': f'{TipoAcao.MES}_{numero}'
             })
 
             if len(linha) == 2:
@@ -86,13 +87,47 @@ class MensagemBot():
         quantidade_faturamento = resumo_mes['quantidade_faturamento']
         saldo = resumo_mes['saldo']
         nome_mes = resumo_mes['nome_mes']
+        percentual = resumo_mes['percentual']
+        maior_despesa = resumo_mes['maior_despesa']
 
-        mensagem_enviar = f'{emojis.EMOJI_DATA} Resumo do Mês de {nome_mes}:\n\n'
+        # Trata o nome do mês OU todos
+        if nome_mes != 'Todos':
+            mensagem_enviar = f'{emojis.EMOJI_DATA} Resumo do Mês de <strong>{nome_mes}</strong>:\n\n'
+        else:
+            mensagem_enviar = f'{emojis.EMOJI_DATA} Resumo de <strong>Todos os Meses</strong>:\n\n'
+
         mensagem_enviar += (
             f'{emojis.EMOJI_FATURAMENTO} Faturamento: R$ {valor_faturamento}\n'
             f'{emojis.EMOJI_DESPESA} Despesa: R$ {valor_despesa}\n'
-            f'{emojis.EMOJI_RELATORIO} Saldo: R$ {saldo}\n\n'
         )
+
+        # Trata o saldo
+        if saldo > 0:
+            mensagem_enviar += f'{emojis.EMOJI_BOLA_VERDE} Saldo: R$ {saldo}\n\n'
+
+        elif saldo < 0:
+            mensagem_enviar += (
+                f'{emojis.EMOJI_BOLA_VERMELHA} Saldo: -R$ {abs(saldo)}\n'
+                f'{emojis.EMOJI_ATENCAO} <strong>Atenção:</strong> '
+                'Suas despesas foram maiores que seus faturamentos neste mês.\n\n'
+            )
+
+        else:
+            mensagem_enviar += (
+                f'{emojis.EMOJI_ATENCAO} Saldo: R$ 0,00\n'
+                'Você teve gastos equilibrados neste mês.\n\n'
+            )
+            
+        mensagem_enviar += (
+            f'{emojis.EMOJI_RELATORIO} Controle Financeiro:\n'
+            f'• <strong>{percentual:.2f}%</strong> do faturamento foi utilizado em despesas.\n\n'
+        )
+
+        if maior_despesa:
+            mensagem_enviar += (
+                f'{emojis.EMOJI_FOGO} Maior Despesa:\n'
+                f'• <strong>{maior_despesa.descricao.capitalize()}</strong> - R$ {maior_despesa.valor:.2f}\n\n'
+            )
 
         mensagem_enviar += (
             f'{emojis.EMOJI_ANOTACAO} Lançamentos:\n'
@@ -125,7 +160,7 @@ class MensagemBot():
             botoes.append([
                 {
                     "text": f"{emojis.EMOJI_LIXEIRA} {registro.descricao.capitalize()}",
-                    "callback_data": f"remover_{registro.id}"
+                    "callback_data": f"{TipoAcao.REMOVER}_{registro.id}"
                 }
             ])
         
@@ -146,14 +181,14 @@ class MensagemBot():
         botoes.append([
             {
                 "text": f"{emojis.EMOJI_SUCESSO} Confirmar",
-                "callback_data": f"confirmar_{registro.pk}"
+                "callback_data": f"{TipoAcao.CONFIRMAR}_{registro.pk}"
             }
         ])
 
         botoes.append([
             {
                 "text": f"{emojis.EMOJI_ERRO} Cancelar",
-                "callback_data": "cancelar"
+                "callback_data": TipoAcao.CANCELAR
             }
         ])
 
@@ -266,19 +301,19 @@ class MensagemBot():
             [
                 {
                     "text": f"{emojis.EMOJI_DESPESA} Despesa",
-                    "callback_data": "menu_despesa"
+                    "callback_data": TipoAcao.MENU_DESPESA
                 }
             ],
             [
                 {
                     "text": f"{emojis.EMOJI_FATURAMENTO} Faturamento",
-                    "callback_data": "menu_faturamento"
+                    "callback_data": TipoAcao.MENU_FATURAMENTO
                 }
             ],
             [
                 {
                     "text": f"{emojis.EMOJI_RELATORIO} Relatórios",
-                    "callback_data": "menu_relatorio"
+                    "callback_data": TipoAcao.MENU_RELATORIO
                 }
             ],
         ]
@@ -299,13 +334,13 @@ class MensagemBot():
             [
                 {
                     "text": "Cadastrar Faturamento",
-                    "callback_data": "cadastro_faturamento"
+                    "callback_data": TipoAcao.CADASTRO_FATURAMENTO
                 }
             ],
             [
                 {
                     "text": "Excluir Faturamento",
-                    "callback_data": "exclusao_faturamento"
+                    "callback_data": TipoAcao.EXCLUSAO_FATURAMENTO
                 }
             ],
         ]
@@ -326,13 +361,13 @@ class MensagemBot():
             [
                 {
                     "text": "Cadastrar Despesa",
-                    "callback_data": "cadastro_despesa"
+                    "callback_data": TipoAcao.CADASTRO_DESPESA
                 }
             ],
             [
                 {
                     "text": "Excluir Despesa",
-                    "callback_data": "exclusao_despesa"
+                    "callback_data": TipoAcao.EXCLUSAO_DESPESA
                 }
             ],
         ]
@@ -353,19 +388,19 @@ class MensagemBot():
             [
                 {
                     "text": "Exibir Despesas",
-                    "callback_data": "exibir_despesas"
+                    "callback_data": TipoAcao.EXIBIR_DESPESAS
                 }
             ],
             [
                 {
                     "text": "Exibir Faturamentos",
-                    "callback_data": "exibir_faturamentos"
+                    "callback_data": TipoAcao.EXIBIR_FATURAMENTOS
                 }
             ],
             [
                 {
                     'text': 'Resumo do Mês',
-                    'callback_data': 'resumo_mes'
+                    'callback_data': TipoAcao.RESUMO_MES
                 }
             ]
         ]

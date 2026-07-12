@@ -1,5 +1,5 @@
 from comum.models import *
-from comum.services import calcular_valor_total_registros, converter_numero_mes, get_meses_ano
+from comum.services import calcular_valor_total_registros, converter_numero_mes, get_meses_ano, calcular_percentual
 
 EXIBICAO_CONFIG = {
     TransacaoChoices.FATURAMENTO : {
@@ -88,6 +88,8 @@ class Relatorio():
                 valor_despesa = calcular_valor_total_registros(registros.filter(tipo=TransacaoChoices.DESPESA))
                 quantidade_despesa = registros.filter(tipo=TransacaoChoices.DESPESA).count()
                 quantidade_faturamento = registros.filter(tipo=TransacaoChoices.FATURAMENTO).count()
+                percentual = calcular_percentual(valor_faturamento, valor_despesa)
+                maior_despesa = registros.filter(tipo=TransacaoChoices.DESPESA).order_by('-valor').first()
 
                 saldo = 0
                 if valor_despesa and valor_faturamento:
@@ -101,6 +103,12 @@ class Relatorio():
                     response['saldo'] = saldo
                     response['status'] = 'mostrar_resumo'
                     response['nome_mes'] = meses[numero_mes]
+                    response['percentual'] = percentual
+                    response['maior_despesa'] = None
+
+                    if maior_despesa:
+                        response['maior_despesa'] = maior_despesa
+                        
                 else:
                     usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
                     response['status'] = 'erro'

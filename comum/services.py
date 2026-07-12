@@ -1,8 +1,9 @@
-from comum.models import Usuario
-from decimal import Decimal, InvalidOperation
 import logging
+from decimal import Decimal, InvalidOperation
+from comum.models import Usuario
 
 logger = logging.getLogger(__name__)
+
 
 def get_usuario(telegram_id):
     return Usuario.objects.filter(telegram_id=telegram_id).first() or None
@@ -48,3 +49,16 @@ def converter_numero_mes(acao_mes):
         return numero_mes
     
     return None
+
+def calcular_percentual(total, parcial):
+    """
+    Calcula o percentual entre dois valores.
+    
+    Exemplo:
+    Total = 5.000 | Parcial = 2.500
+    Resultado = 50%
+    """
+
+    if total == 0:
+        return 0
+    return (parcial * 100) / total
