@@ -1,27 +1,21 @@
+import logging
 import requests
 from django.conf import settings
-from comum.models import StatusUsuario, Transacao, TransacaoChoices
-from comum.services import *
-from comum.usuario_service import UsuarioService
+from django.core.exceptions import ValidationError
+from django.http import JsonResponse
 from mercadopago import services
 from bot.mensagem import MensagemBot
 from bot.relatorios import Relatorio
 from bot.transacoes import TransacaoService
-from django.http import JsonResponse
-from django.core.exceptions import ValidationError
-import logging
+from comum.models import StatusUsuario, Transacao, TransacaoChoices
+from comum.services import converter_valor_decimal, get_usuario
+from comum.usuario_service import UsuarioService
+from bot.enums.enums import TipoMenu
 
 logger = logging.getLogger(__name__)
 
 URL_ENVIAR_MSG = f'{settings.URL_BASE_TELEGRAM}{settings.TOKEN_BOT}/sendMessage'
 URL_CONFIRMAR_CLIQUE_BOTAO = f'{settings.URL_BASE_TELEGRAM}{settings.TOKEN_BOT}/answerCallbackQuery'
-
-
-class TipoMenu():
-    PRINCIPAL = 'principal'
-    FATURAMENTO = 'faturamento'
-    DESPESA = 'despesa'
-    RELATORIO = 'relatorio'
 
 
 class TelegramClient():
@@ -143,71 +137,98 @@ class TelegramService():
                     return acao_realizar()
             
         if usuario:
-
-            # Cadastro de Faturamento
+            if self.processar_cadastro(usuario, acao): return True
+            elif self.processar_exibicao(usuario, acao): return True
+            elif self.processar_exclusao(usuario, acao): return True
+            elif self.processar_resumo(usuario, acao): return True
+            else: return self.menu(usuario, TipoMenu.PRINCIPAL)
+        else:
+            return self.boas_vindas(usuario)
+    
+    def processar_cadastro(self, usuario, acao):
             msg_usuario = self.text is not None
+
+            # Cadastro de faturamento
             if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_VALOR_FATURAMENTO and msg_usuario:
                 usuario.set_status(StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_FATURAMENTO)
-                return self.registrar_transacao(TransacaoChoices.FATURAMENTO, usuario)
+                self.registrar_transacao(TransacaoChoices.FATURAMENTO, usuario)
+                return True
             
             if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_FATURAMENTO and msg_usuario:
                 usuario.set_status(StatusUsuario.INFORMOU_FATURAMENTO)
-                return self.registrar_transacao(TransacaoChoices.FATURAMENTO, usuario)
+                self.registrar_transacao(TransacaoChoices.FATURAMENTO, usuario)
+                return True
             
             # Cadastro de Despesa
             if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_VALOR_DESPESA and msg_usuario:
                 usuario.set_status(StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_DESPESA)
-                return self.registrar_transacao(TransacaoChoices.DESPESA, usuario)
+                self.registrar_transacao(TransacaoChoices.DESPESA, usuario)
+                return True
             
             if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_DESPESA and msg_usuario:
                 usuario.set_status(StatusUsuario.INFORMOU_DESPESA)
-                return self.registrar_transacao(TransacaoChoices.DESPESA, usuario)
-        
-            # Exibição de Gastos
-            if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_MES_DESPESA and acao:
-                usuario.set_status(StatusUsuario.AGUARDANDO_VER_DESPESA)
-                return self.exibir(TransacaoChoices.DESPESA, usuario, acao)
-        
-            # Exibição de Faturamento
-            if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_MES_FATURAMENTO and acao:
-                usuario.set_status(StatusUsuario.AGUARDANDO_VER_FATURAMENTO)
-                return self.exibir(TransacaoChoices.FATURAMENTO, usuario, acao)
+                self.registrar_transacao(TransacaoChoices.DESPESA, usuario)
+                return True
             
-            # Exclusão de Despesa
-            if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_MES_DESPESA_EXCLUSAO and acao:
-                usuario.set_status(StatusUsuario.AGUARDANDO_VER_DESPESA_EXCLUSAO)
-                return self.excluir_transacao(TransacaoChoices.DESPESA, usuario, acao)
+            return False
+    
+    def processar_exclusao(self, usuario, acao):
+        # Exclusão de Despesa
+        if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_MES_DESPESA_EXCLUSAO and acao:
+            usuario.set_status(StatusUsuario.AGUARDANDO_VER_DESPESA_EXCLUSAO)
+            self.excluir_transacao(TransacaoChoices.DESPESA, usuario, acao)
+            return True
 
-            if usuario.status == StatusUsuario.AGUARDANDO_VER_DESPESA_EXCLUSAO:
-                usuario.set_status(StatusUsuario.AGUARDANDO_CONFIRMAR_EXCLUSAO_DESPESA)
-                return self.excluir_transacao(TransacaoChoices.DESPESA, usuario, acao)
-            
-            if usuario.status == StatusUsuario.AGUARDANDO_CONFIRMAR_EXCLUSAO_DESPESA:
-                usuario.set_status(StatusUsuario.CONFIRMOU_CANCELOU_EXCLUSAO_DESPESA)
-                return self.excluir_transacao(TransacaoChoices.DESPESA, usuario, acao)
-            
-            # Exclusão de Faturamento
-            if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_MES_FATURAMENTO_EXCLUSAO and acao:
-                usuario.set_status(StatusUsuario.AGUARDANDO_VER_FATURAMENTO_EXCLUSAO)
-                return self.excluir_transacao(TransacaoChoices.FATURAMENTO, usuario, acao)
+        elif usuario.status == StatusUsuario.AGUARDANDO_VER_DESPESA_EXCLUSAO:
+            usuario.set_status(StatusUsuario.AGUARDANDO_CONFIRMAR_EXCLUSAO_DESPESA)
+            self.excluir_transacao(TransacaoChoices.DESPESA, usuario, acao)
+            return True
+        
+        elif usuario.status == StatusUsuario.AGUARDANDO_CONFIRMAR_EXCLUSAO_DESPESA:
+            usuario.set_status(StatusUsuario.CONFIRMOU_CANCELOU_EXCLUSAO_DESPESA)
+            self.excluir_transacao(TransacaoChoices.DESPESA, usuario, acao)
+            return True
+        
+        # Exclusão de Faturamento
+        elif usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_MES_FATURAMENTO_EXCLUSAO and acao:
+            usuario.set_status(StatusUsuario.AGUARDANDO_VER_FATURAMENTO_EXCLUSAO)
+            self.excluir_transacao(TransacaoChoices.FATURAMENTO, usuario, acao)
+            return True
 
-            if usuario.status == StatusUsuario.AGUARDANDO_VER_FATURAMENTO_EXCLUSAO:
-                usuario.set_status(StatusUsuario.AGUARDANDO_CONFIRMAR_EXCLUSAO_FATURAMENTO)
-                return self.excluir_transacao(TransacaoChoices.FATURAMENTO, usuario, acao)
-            
-            if usuario.status == StatusUsuario.AGUARDANDO_CONFIRMAR_EXCLUSAO_FATURAMENTO:
-                usuario.set_status(StatusUsuario.CONFIRMOU_CANCELOU_EXCLUSAO_FATURAMENTO)
-                return self.excluir_transacao(TransacaoChoices.FATURAMENTO, usuario, acao)
-            
-            # Resumo do Mês
-            if usuario.status == StatusUsuario.AGUARDANDO_MES_RESUMO and acao:
-                usuario.set_status(StatusUsuario.AGUARDANDO_VER_RESUMO)
-                return self.resumo_mes(usuario, acao)
-            
-            return self.menu(usuario, TipoMenu.PRINCIPAL)
-            
+        elif usuario.status == StatusUsuario.AGUARDANDO_VER_FATURAMENTO_EXCLUSAO:
+            usuario.set_status(StatusUsuario.AGUARDANDO_CONFIRMAR_EXCLUSAO_FATURAMENTO)
+            self.excluir_transacao(TransacaoChoices.FATURAMENTO, usuario, acao)
+            return True
+        
+        elif usuario.status == StatusUsuario.AGUARDANDO_CONFIRMAR_EXCLUSAO_FATURAMENTO:
+            usuario.set_status(StatusUsuario.CONFIRMOU_CANCELOU_EXCLUSAO_FATURAMENTO)
+            self.excluir_transacao(TransacaoChoices.FATURAMENTO, usuario, acao)
+            return True
+        
         else:
-            return self.boas_vindas(usuario)
+            return False
+            
+    def processar_exibicao(self, usuario, acao):
+        # Exibição de Despesa
+        if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_MES_DESPESA and acao:
+            usuario.set_status(StatusUsuario.AGUARDANDO_VER_DESPESA)
+            self.exibir(TransacaoChoices.DESPESA, usuario, acao)
+            return True
+        
+        # Exibição de Faturamento
+        if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_MES_FATURAMENTO and acao:
+            usuario.set_status(StatusUsuario.AGUARDANDO_VER_FATURAMENTO)
+            self.exibir(TransacaoChoices.FATURAMENTO, usuario, acao)
+            return True
+        
+        return False
+
+    def processar_resumo(self, usuario, acao):
+        if usuario.status == StatusUsuario.AGUARDANDO_MES_RESUMO and acao:
+            usuario.set_status(StatusUsuario.AGUARDANDO_VER_RESUMO)
+            self.resumo_mes(usuario, acao)
+            return True
+        return False
     
     def boas_vindas(self, usuario):
         response = services.gerar_plano()
