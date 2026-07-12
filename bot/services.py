@@ -26,37 +26,40 @@ class TipoMenu():
 
 class TelegramClient():
     @staticmethod
-    def enviar_mensagem(text:str, chat_id:str):
+    def post(url, dicionario_dados):
+        """
+        Faz requisição 'POST' para a API do telegram
+        - Recebe URL e dicionário de dados
+        """
         try:
-            json = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
-            requests.post(URL_ENVIAR_MSG, json=json)
-        except Exception as e:
-            print(e)
+            response = requests.post(url=url, json=dicionario_dados, timeout=10)
+            response.raise_for_status() # Tratando os erros HTTP
+            return response
+        
+        except requests.RequestException:
+            logger.exception("Erro ao fazer 'POST' para a API do Telegram.")
+            return None
+        
+    @staticmethod
+    def enviar_mensagem(text:str, chat_id:str):
+        json = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
+        TelegramClient.post(URL_ENVIAR_MSG, json)
     
     @staticmethod
     def enviar_mensagens_botoes(text:str, chat_id:str, botoes):
-        try:
-            json = {
-                'chat_id': chat_id,
-                'text': text if text != '' else '',
-                'reply_markup':{
-                    'inline_keyboard':botoes
-                }
+        json = {
+            'chat_id': chat_id,
+            'text': text if text != '' else '',
+            'reply_markup':{
+                'inline_keyboard':botoes
             }
-            requests.post(URL_ENVIAR_MSG, json=json)
+        }
 
-        except Exception as e:
-            print(e)
+        TelegramClient.post(URL_ENVIAR_MSG, json)
     
-    # Faz o callback do envio de uma opção cliques
     @staticmethod
-    def callback(id):
-        try:
-            json = {'callback_query_id': id}
-            requests.post(URL_CONFIRMAR_CLIQUE_BOTAO, json=json)
-
-        except Exception as e:
-            print(e)
+    def callback(callback_query_id):
+        TelegramClient.post(URL_CONFIRMAR_CLIQUE_BOTAO, {'callback_query_id': callback_query_id})
 
 
 '''
@@ -65,6 +68,13 @@ de todas as mensagens enviadas e recebidas
 pelo bot/usuário.
 '''
 class TelegramService():
+    MENUS = {
+        TipoMenu.PRINCIPAL: MensagemBot.mensagem_menu_principal,
+        TipoMenu.FATURAMENTO: MensagemBot.mensagem_menu_faturamento,
+        TipoMenu.DESPESA: MensagemBot.mensagem_menu_despesa,
+        TipoMenu.RELATORIO: MensagemBot.mensagem_menu_relatorio,
+    }
+
     # Dicionário utilizado no método genérico de transações
     TRANSACAO_CONFIG = {
         TransacaoChoices.FATURAMENTO : {
@@ -366,25 +376,23 @@ class TelegramService():
         elif status == 'mostrar_resumo':
             usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
             mensagem_enviar = MensagemBot.mensagem_resumo_mes(resumo_mes)
-            print(mensagem_enviar)
             return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
 
+    # Métodos auxiliares (não são funcionalidades)
     def callback(self):
+        """
+        - Se tiver que fazer o callback (se for ação), chama o método que faz o callback para o usuário
+        """
         if self.callback_query_id is not None:
             return TelegramClient.callback(self.callback_query_id)
         return None
     
     def menu(self, usuario, tipo_menu):
+        """
+        - Recebe o tipo de menu que deve exibir
+        - Seleciona no dicionário, chama o método e guarda na variável
+        - Passa valores das chaves do dicionário retornado para o método de envio de mensagem
+        """
         usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
-        menu = None
-
-        if tipo_menu == TipoMenu.PRINCIPAL:
-            menu = MensagemBot.mensagem_menu_principal()
-        elif tipo_menu == TipoMenu.FATURAMENTO:
-            menu = MensagemBot.mensagem_menu_faturamento()
-        elif tipo_menu == TipoMenu.DESPESA:
-            menu = MensagemBot.mensagem_menu_despesa()
-        elif tipo_menu == TipoMenu.RELATORIO:
-            menu = MensagemBot.mensagem_menu_relatorio()
-
+        menu = self.MENUS[tipo_menu]()
         TelegramClient.enviar_mensagens_botoes(menu['text'], self.chat_id, menu['botoes'])
