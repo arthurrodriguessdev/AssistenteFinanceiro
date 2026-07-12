@@ -1,5 +1,5 @@
 from comum.models import *
-from comum.services import calcular_valor_total_registros, converter_valor_inteiro
+from comum.services import calcular_valor_total_registros, converter_valor_inteiro, converter_numero_mes
 
 TRANSACOES_CONFIG = {
     TransacaoChoices.FATURAMENTO : {
@@ -31,24 +31,29 @@ class TransacaoService():
             response['status'] = 'mostrar_meses'
         
         if usuario.status == configuracao['status_aguardando_ver']:
-            numero_mes = converter_valor_inteiro(text)
+            if acao is not None:
+                numero_mes = converter_numero_mes(acao)
+                
+                if numero_mes is None:
+                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                    response['status'] = 'erro'
+                    return response
+                
+                registros = Transacao.objects.filter(
+                    tipo=tipo_registro, 
+                    usuario=usuario,
+                )
 
-            if numero_mes is None:
-                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                if numero_mes != 0:
+                    registros = registros.filter(registrada_em__month=numero_mes)
+
+                response['status'] = 'mostrar_registros'
+                response['registros'] = registros
+                response['valor_total'] = calcular_valor_total_registros(registros)
+
+            else:
                 response['status'] = 'erro'
                 return response
-            
-            registros = Transacao.objects.filter(
-                tipo=tipo_registro, 
-                usuario=usuario,
-            )
-
-            if numero_mes != 0:
-                registros = registros.filter(registrada_em__month=numero_mes)
-
-            response['status'] = 'mostrar_registros'
-            response['registros'] = registros
-            response['valor_total'] = calcular_valor_total_registros(registros)
         
         if usuario.status == configuracao['status_aguardando_confirmar_exclusao']:
             if acao is not None:

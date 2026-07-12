@@ -1,5 +1,6 @@
 from comum.models import TransacaoChoices
 from bot import emojis
+from comum.services import get_meses_ano
 
 
 class MensagemBot():
@@ -27,17 +28,31 @@ class MensagemBot():
 
     @staticmethod
     def mensagem_exibir_meses():
-        MESES = [
-            'Todos Meses', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-        ]
+        MESES = get_meses_ano()
 
-        mensagem_enviar = 'Informe o número referente ao mês desejado para consulta:\n\n'
-        for numero, nome_mes in enumerate(MESES, 0):
-            mensagem_enviar += f'• {numero} - {nome_mes}\n'
+        botoes = []
+        linha = []
+        for numero, nome in enumerate(MESES):
+            linha.append({
+                'text': nome,
+                'callback_data': f'mes_{numero}'
+            })
+
+            if len(linha) == 2:
+                botoes.append(linha)
+                linha = []
         
-        return mensagem_enviar
+        if linha:
+            botoes.append(linha)
 
+        menu_meses = {
+            'botoes': botoes,
+            'text': f'Selecione o mês desejado para consulta:\n\n'
+        }   
+
+        return menu_meses
+
+    # Relatórios
     @staticmethod
     def mensagem_exibir_registros(registros, valor_total, tipo_registro):
         tipo = 'despesa' if tipo_registro == TransacaoChoices.DESPESA else 'faturamento'
@@ -60,6 +75,33 @@ class MensagemBot():
         mensagem_enviar += f'<strong>Valor Total:</strong> R${valor_total}'
         return mensagem_enviar
     
+    @staticmethod
+    def mensagem_resumo_mes(resumo_mes):
+        if not resumo_mes['status'] == 'mostrar_resumo':
+            return 'Erro Resumo'
+        
+        valor_faturamento = resumo_mes['valor_faturamento'] 
+        valor_despesa = resumo_mes['valor_despesa']
+        quantidade_despesa = resumo_mes['quantidade_despesa']
+        quantidade_faturamento = resumo_mes['quantidade_faturamento']
+        saldo = resumo_mes['saldo']
+        nome_mes = resumo_mes['nome_mes']
+
+        mensagem_enviar = f'{emojis.EMOJI_DATA} Resumo do Mês de {nome_mes}:\n\n'
+        mensagem_enviar += (
+            f'{emojis.EMOJI_FATURAMENTO} Faturamento: R$ {valor_faturamento}\n'
+            f'{emojis.EMOJI_DESPESA} Despesa: R$ {valor_despesa}\n'
+            f'{emojis.EMOJI_RELATORIO} Saldo: R$ {saldo}\n\n'
+        )
+
+        mensagem_enviar += (
+            f'{emojis.EMOJI_ANOTACAO} Lançamentos:\n'
+            f'• {quantidade_despesa} despesas\n'
+            f'• {quantidade_faturamento} faturamentos'
+        )
+
+        return mensagem_enviar
+
     @staticmethod
     def mensagem_exibir_registros_exclusao(registros, tipo_registro):
         tipo = 'despesa' if tipo_registro == TransacaoChoices.DESPESA else 'faturamento'
@@ -320,6 +362,12 @@ class MensagemBot():
                     "callback_data": "exibir_faturamentos"
                 }
             ],
+            [
+                {
+                    'text': 'Resumo do Mês',
+                    'callback_data': 'resumo_mes'
+                }
+            ]
         ]
 
         menu = {

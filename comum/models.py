@@ -32,6 +32,8 @@ class StatusUsuario(models.IntegerChoices):
 
     AGUARDANDO_VER_DESPESA = 13, 'Aguardando Visualizar Despesa'
     AGUARDANDO_VER_FATURAMENTO = 14, 'Aguardando Visualizar Faturamento'
+    AGUARDANDO_MES_RESUMO = 21, 'Aguardando Mês Resumo'
+    AGUARDANDO_VER_RESUMO = 22, 'Aguardando Ver Resumo'
     
 
 class TransacaoChoices(models.IntegerChoices):
