@@ -236,6 +236,7 @@ class TelegramService():
         try:
             link_pagamento = response.get('init_point')
         except Exception as e:
+            logger.exception('Erro ao gerar o link de pagamento.')
             return JsonResponse({'exception': e})
         
         TelegramClient.enviar_mensagem(MensagemBot.mensagem_boas_vindas(usuario, link_pagamento), self.chat_id)

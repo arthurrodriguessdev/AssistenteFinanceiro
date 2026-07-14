@@ -42,7 +42,8 @@ def webhook_bot(request):
 
             telegram.processar(botao_clicado)
         
-    except:
+    except Exception:
+
         logger.exception('Erro no webhook do telegram (tentativa de acessar os dados).')
         if telegram:
             TelegramClient.enviar_mensagem(MensagemBot.mensagem_erro(), telegram.chat_id)

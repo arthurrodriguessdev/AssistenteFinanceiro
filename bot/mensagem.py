@@ -3,6 +3,8 @@ from bot import emojis
 from bot.enums.enums import TipoAcao
 from comum.services import get_meses_ano
 
+BOTOES_POR_LINHA = 2
+
 
 class MensagemBot():
     """
@@ -39,7 +41,7 @@ class MensagemBot():
                 'callback_data': f'{TipoAcao.MES}_{numero}'
             })
 
-            if len(linha) == 2:
+            if len(linha) == BOTOES_POR_LINHA:
                 botoes.append(linha)
                 linha = []
         
@@ -53,11 +55,15 @@ class MensagemBot():
 
         return menu_meses
 
+    # Formatação e auxílio
+    @staticmethod
+    def get_tipo_transacao(tipo_transacao) -> str:
+        return 'despesa' if tipo_transacao == TransacaoChoices.DESPESA else 'faturamento'
+    
     # Relatórios
     @staticmethod
     def mensagem_exibir_registros(registros, valor_total, tipo_registro):
-        tipo = 'despesa' if tipo_registro == TransacaoChoices.DESPESA else 'faturamento'
-
+        tipo = MensagemBot.get_tipo_transacao(tipo_registro)
         if not registros:
             return (
                 f'Nenhum registro de {tipo} foi encontrado.\n\n'
@@ -137,9 +143,10 @@ class MensagemBot():
 
         return mensagem_enviar
 
+    # Operações CRUD
     @staticmethod
     def mensagem_exibir_registros_exclusao(registros, tipo_registro):
-        tipo = 'despesa' if tipo_registro == TransacaoChoices.DESPESA else 'faturamento'
+        tipo = MensagemBot.get_tipo_transacao(tipo_registro)
 
         if not registros:
             return (
@@ -196,13 +203,15 @@ class MensagemBot():
 
     @staticmethod
     def mensagem_exclusao_confirmada(tipo_registro):
+        """
+        Retorna 'despesa' ou 'faturamento' verificando o tipo dela
+        """
         tipo = 'despesa' if tipo_registro == TransacaoChoices.DESPESA else 'faturamento'
         return (f'{emojis.EMOJI_SUCESSO} O registro de {tipo} foi excluído com sucesso!')
     
     @staticmethod
     def mensagem_exclusao_cancelada(tipo_registro):
-        tipo = 'despesa' if tipo_registro == TransacaoChoices.DESPESA else 'faturamento'
-        return (f'{emojis.EMOJI_ERRO} A exclusão do registro de {tipo} foi cancelada.')
+        return (f'{emojis.EMOJI_ERRO} A exclusão do registro de {MensagemBot.get_tipo_transacao(tipo_registro)} foi cancelada.')
         
     @staticmethod
     def mensagem_informar_valor(tipo_transacao):
@@ -232,6 +241,9 @@ class MensagemBot():
         
         return mensagem_enviar
     
+    '''
+    Mensagens de sucesso
+    '''
     @staticmethod
     def mensagem_sucesso_registro(tipo_transacao, valor):
         if tipo_transacao == TransacaoChoices.FATURAMENTO:

@@ -37,7 +37,7 @@ def converter_valor_inteiro(valor_converter):
         valor_converter = int(valor_converter)
         return valor_converter
     
-    except:
+    except ValueError:
         logger.exception(f'Erro ao converter: {valor_converter}')
         return None
 

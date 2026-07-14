@@ -1,4 +1,4 @@
-from comum.models import *
+from comum.models import StatusUsuario, Transacao, TransacaoChoices
 from comum.services import calcular_valor_total_registros, converter_valor_inteiro, converter_numero_mes
 
 TRANSACOES_CONFIG = {
@@ -27,10 +27,10 @@ class TransacaoService():
         if usuario.status == StatusUsuario.AGUARDANDO_MENU:
             usuario.set_status(configuracao['status_aguardando_mes'])
         
-        if usuario.status == configuracao['status_aguardando_mes']:
+        elif usuario.status == configuracao['status_aguardando_mes']:
             response['status'] = 'mostrar_meses'
         
-        if usuario.status == configuracao['status_aguardando_ver']:
+        elif usuario.status == configuracao['status_aguardando_ver']:
             if acao is not None:
                 numero_mes = converter_numero_mes(acao)
                 
@@ -55,7 +55,7 @@ class TransacaoService():
                 response['status'] = 'erro'
                 return response
         
-        if usuario.status == configuracao['status_aguardando_confirmar_exclusao']:
+        elif usuario.status == configuracao['status_aguardando_confirmar_exclusao']:
             if acao is not None:
                 acao = acao.split('_')
                 id_registro = acao[1]
@@ -66,9 +66,9 @@ class TransacaoService():
                     return response
                 
                 response['status'] = 'mostrar_confirmacao'
-                response['registro_excluir'] = Transacao.objects.get(id=id_registro)
+                response['registro_excluir'] = Transacao.objects.get(id=id_registro, usuario=usuario)
         
-        if usuario.status == configuracao['status_confirmou_ou_cancelou_exclusao']:
+        elif usuario.status == configuracao['status_confirmou_ou_cancelou_exclusao']:
             if acao is not None:
                 if acao.startswith('confirmar'):
                     acao = acao.split('_')
@@ -84,7 +84,7 @@ class TransacaoService():
                         Transacao.objects.get(id=id_registro).delete()
                         response['status'] = 'mostrar_mensagem_excluiu_sucesso'
 
-                    except:
+                    except Transacao.DoesNotExist:
                         response['status'] = 'erro' 
                 else:
                     usuario.set_status(StatusUsuario.AGUARDANDO_MENU)

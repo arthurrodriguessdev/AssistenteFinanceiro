@@ -1,4 +1,4 @@
-from comum.models import *
+from comum.models import StatusUsuario, Transacao, TransacaoChoices
 from comum.services import calcular_valor_total_registros, converter_numero_mes, get_meses_ano, calcular_percentual
 
 EXIBICAO_CONFIG = {
@@ -80,20 +80,20 @@ class Relatorio():
                     return response
             
                 registros = Transacao.objects.filter(usuario=usuario)
-
                 if numero_mes != 0:
                     registros = registros.filter(registrada_em__month=numero_mes)
 
-                valor_faturamento = calcular_valor_total_registros(registros.filter(tipo=TransacaoChoices.FATURAMENTO))
-                valor_despesa = calcular_valor_total_registros(registros.filter(tipo=TransacaoChoices.DESPESA))
-                quantidade_despesa = registros.filter(tipo=TransacaoChoices.DESPESA).count()
-                quantidade_faturamento = registros.filter(tipo=TransacaoChoices.FATURAMENTO).count()
-                percentual = calcular_percentual(valor_faturamento, valor_despesa)
-                maior_despesa = registros.filter(tipo=TransacaoChoices.DESPESA).order_by('-valor').first()
+                faturamentos = registros.filter(tipo=TransacaoChoices.FATURAMENTO)
+                despesas = registros.filter(tipo=TransacaoChoices.DESPESA)
 
-                saldo = 0
-                if valor_despesa and valor_faturamento:
-                    saldo = valor_faturamento - valor_despesa
+                # Campos a serem retornados no dicionário
+                valor_faturamento = calcular_valor_total_registros(faturamentos)
+                valor_despesa = calcular_valor_total_registros(despesas)
+                quantidade_despesa = despesas.count()
+                quantidade_faturamento = faturamentos.count()
+                percentual = calcular_percentual(valor_faturamento, valor_despesa)
+                maior_despesa = despesas.order_by('-valor').first()
+                saldo = valor_faturamento - valor_despesa
 
                 if registros.exists():
                     response['valor_faturamento'] = valor_faturamento
