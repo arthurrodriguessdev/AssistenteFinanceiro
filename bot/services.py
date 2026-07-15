@@ -7,8 +7,9 @@ from mercadopago import services
 from bot.mensagem import MensagemBot
 from bot.relatorios import Relatorio
 from bot.transacoes import TransacaoService
-from comum.models import StatusUsuario, Transacao, TransacaoChoices
-from comum.services import converter_valor_decimal, get_usuario
+from bot.categorias import CategoriaService
+from comum.models import StatusUsuario, Transacao, TransacaoChoices, Categoria, ObjetoChoices
+from comum.services import converter_valor_decimal, get_usuario, get_todas_categorias_usuario, converter_acao_id, get_ultima_transacao
 from comum.usuario_service import UsuarioService
 from bot.enums.enums import TipoMenu
 
@@ -67,6 +68,8 @@ class TelegramService():
         TipoMenu.FATURAMENTO: MensagemBot.mensagem_menu_faturamento,
         TipoMenu.DESPESA: MensagemBot.mensagem_menu_despesa,
         TipoMenu.RELATORIO: MensagemBot.mensagem_menu_relatorio,
+        TipoMenu.CONFIGURACAO: MensagemBot.mensagem_menu_configuracao,
+        TipoMenu.CATEGORIA: MensagemBot.mensagem_menu_categoria
     }
 
     # Dicionário utilizado no método genérico de transações
@@ -74,13 +77,12 @@ class TelegramService():
         TransacaoChoices.FATURAMENTO : {
             'status_valor': StatusUsuario.AGUARDANDO_INFORMAR_VALOR_FATURAMENTO,
             'status_descricao': StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_FATURAMENTO,
-            'status_informou': StatusUsuario.INFORMOU_FATURAMENTO
             },
         
         TransacaoChoices.DESPESA : {
             'status_valor': StatusUsuario.AGUARDANDO_INFORMAR_VALOR_DESPESA,
             'status_descricao': StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_DESPESA,
-            'status_informou': StatusUsuario.INFORMOU_DESPESA
+            'status_categoria': StatusUsuario.AGUARDANDO_INFORMAR_CATEGORIA_DESPESA,
         }
     }
 
@@ -117,18 +119,24 @@ class TelegramService():
         usuario = get_usuario(self.telegram_id)
 
         acoes_sistema = {
+            # Menus
             'menu_despesa': lambda: self.menu(usuario, TipoMenu.DESPESA),
             'menu_faturamento': lambda: self.menu(usuario, TipoMenu.FATURAMENTO),
             'menu_relatorio': lambda: self.menu(usuario, TipoMenu.RELATORIO),
+            'menu_configuracao': lambda: self.menu(usuario, TipoMenu.CONFIGURACAO),
+            'menu_categoria': lambda: self.menu(usuario, TipoMenu.CATEGORIA),
+
             'cadastro_despesa': lambda: self.registrar_transacao(TransacaoChoices.DESPESA, usuario),
             'cadastro_faturamento': lambda: self.registrar_transacao(TransacaoChoices.FATURAMENTO, usuario),
             'exclusao_despesa': lambda: self.excluir_transacao(TransacaoChoices.DESPESA, usuario),
             'exclusao_faturamento': lambda: self.excluir_transacao(TransacaoChoices.FATURAMENTO, usuario),
             'exibir_despesas':  lambda: self.exibir(TransacaoChoices.DESPESA, usuario, acao),
             'exibir_faturamentos': lambda: self.exibir(TransacaoChoices.FATURAMENTO, usuario, acao),
-            'resumo_mes': lambda: self.resumo_mes(usuario, acao)
+            'resumo_mes': lambda: self.resumo_mes(usuario, acao),
+            'cadastro_categoria': lambda: self.registrar_categoria(usuario),
+            'exclusao_categoria': lambda: self.excluir_categioria(usuario)
         }
-
+        
         # Processa as ações e chama o método equivalente
         if acao is not None and self.callback_query_id is not None:
             if usuario is not None:
@@ -141,6 +149,7 @@ class TelegramService():
             elif self.processar_exibicao(usuario, acao): return True
             elif self.processar_exclusao(usuario, acao): return True
             elif self.processar_resumo(usuario, acao): return True
+            elif self.processar_cadastro_categoria(usuario): return True
             else: return self.menu(usuario, TipoMenu.PRINCIPAL)
         else:
             return self.boas_vindas(usuario)
@@ -166,9 +175,26 @@ class TelegramService():
                 return True
             
             if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_DESCRICAO_DESPESA and msg_usuario:
-                usuario.set_status(StatusUsuario.INFORMOU_DESPESA)
+                try:
+                    transacao = get_ultima_transacao(usuario, TransacaoChoices.DESPESA)
+                    transacao.descricao = self.text
+                    transacao.save()
+                except Exception:
+                    logger.exception("Erro ao salvar descrição da despesa.")
+                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                    return TelegramClient.enviar_mensagem(MensagemBot.mensagem_erro(),self.chat_id)
+                
+                usuario.set_status(StatusUsuario.AGUARDANDO_INFORMAR_CATEGORIA_DESPESA)
                 self.registrar_transacao(TransacaoChoices.DESPESA, usuario)
                 return True
+            
+            if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_CATEGORIA_DESPESA and acao:
+                self.registrar_transacao(TransacaoChoices.DESPESA, usuario, acao)
+                return True
+            
+            # else:
+            #     self.registrar_transacao(TransacaoChoices.DESPESA, usuario)
+            #     return True
             
             return False
     
@@ -230,6 +256,12 @@ class TelegramService():
             return True
         return False
     
+    def processar_cadastro_categoria(self, usuario):
+        if usuario.status == StatusUsuario.AGUARDANDO_INFORMAR_NOME_CATEGORIA_CADASTRO:
+            self.registrar_categoria(usuario)
+            return True
+        return False
+    
     def boas_vindas(self, usuario):
         response = services.gerar_plano()
 
@@ -241,7 +273,7 @@ class TelegramService():
         
         TelegramClient.enviar_mensagem(MensagemBot.mensagem_boas_vindas(usuario, link_pagamento), self.chat_id)
     
-    def registrar_transacao(self, tipo_transacao, usuario):
+    def registrar_transacao(self, tipo_transacao, usuario, acao=None):
         """ 
         Método que registra todas as transações aceitas pelo sistema:
         - Faturamento
@@ -305,29 +337,41 @@ class TelegramService():
             mensagem_enviar = MensagemBot.mensagem_informar_descricao(tipo_transacao)
             return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
         
-        elif usuario.status == configuracao['status_informou']:
-            try:
-                transacao = Transacao.objects.filter(
-                    usuario=usuario,
-                    tipo=tipo_transacao
-                ).last()
+        elif usuario.status == configuracao['status_categoria']:
+            if acao is None:
+                categorias = get_todas_categorias_usuario(usuario)
+                mensagem_enviar = MensagemBot.mensagem_exibir_categorias(categorias)
+                return TelegramClient.enviar_mensagens_botoes(mensagem_enviar['text'], self.chat_id, mensagem_enviar['botoes'])
 
-                transacao.descricao = self.text
-                transacao.save()
+            else:
+                id_categoria = converter_acao_id(acao)
+                if id_categoria is not None:
+                    try:
+                        categoria_selecionada = Categoria.objects.get(pk=id_categoria)
+                        
+                        transacao = get_ultima_transacao(usuario, tipo_transacao)
+                        transacao.categoria = categoria_selecionada
+                        transacao.save()
 
+                        usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                        mensagem_enviar = MensagemBot.mensagem_sucesso_registro(transacao.valor, tipo_transacao, None)
+                        return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+
+                    except Categoria.DoesNotExist:
+                        logger.exception("Erro ao buscar a categoria.")
+                        mensagem_enviar = MensagemBot.mensagem_erro()
+                        return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+                 
+                    except Exception:
+                        logger.exception("Erro ao buscar transação e atualizar categoria e descrição.")
+                        mensagem_enviar = MensagemBot.mensagem_erro()
+                        return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+                    
+                    finally:
+                        usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                
                 usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
-                mensagem_enviar = MensagemBot.mensagem_sucesso_registro(
-                    tipo_transacao, 
-                    transacao.valor
-                )
-
-                return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
-            
-            except Exception:
-                logger.exception("Erro no registro de transação.")
-                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
-                mensagem_enviar = MensagemBot.mensagem_erro()
-                return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+                return TelegramClient.enviar_mensagem(MensagemBot.mensagem_erro(), self.chat_id)
 
     def exibir(self, tipo_registro, usuario, acao):
         self.callback()
@@ -399,6 +443,26 @@ class TelegramService():
             usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
             mensagem_enviar = MensagemBot.mensagem_resumo_mes(resumo_mes)
             return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+
+    def registrar_categoria(self, usuario):
+        self.callback()
+
+        resultado = CategoriaService.criar(usuario, self.text)
+        status = resultado.get('status', None)
+
+        if status == 'solicitar_nome':
+            mensagem_enviar = MensagemBot.mensagem_informar_nome_categoria()
+            return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+        
+        elif status == 'sucesso':
+            mensagem_enviar = MensagemBot.mensagem_sucesso_registro(None, None, ObjetoChoices.CATEGORIA)
+            usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+            return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+        
+        return TelegramClient.enviar_mensagem(MensagemBot.mensagem_erro(),self.chat_id)
+        
+    def excluir_categoria(self, usuario):
+        ...
 
     # Métodos auxiliares (não são funcionalidades)
     def callback(self):

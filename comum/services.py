@@ -1,6 +1,6 @@
 import logging
 from decimal import Decimal, InvalidOperation
-from comum.models import Usuario
+from comum.models import Usuario, Categoria, Transacao
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +41,18 @@ def converter_valor_inteiro(valor_converter):
         logger.exception(f'Erro ao converter: {valor_converter}')
         return None
 
-def converter_numero_mes(acao_mes):
-    if acao_mes is not None:
-        acao_mes = acao_mes.split('_')
-        numero_mes = acao_mes[1]
-        numero_mes = converter_valor_inteiro(numero_mes)
-        return numero_mes
+def converter_acao_id(acao):
+    """
+    Função que pega somente a parte numérica (id) nos padrões:
+    - categoria_12
+    - mes_1
+    - transacao_4
+    """
+    if acao is not None:
+        acao = acao.split('_')
+        numero_id = acao[1]
+        numero_id = converter_valor_inteiro(numero_id)
+        return numero_id
     
     return None
 
@@ -62,3 +68,25 @@ def calcular_percentual(total, parcial):
     if total == 0:
         return 0
     return (parcial * 100) / total
+
+def get_categorias_usuario(usuario):
+    categorias = usuario.categorias.all() or None
+    return categorias
+
+def get_categorias_padrao():
+    return Categoria.objects.filter(usuario__isnull=True, padrao=True)
+
+def get_todas_categorias_usuario(usuario):
+    """
+    Retorna:
+    - Todas categorias cadastradas pelo usuário; E
+    - Categorias padrão do sistema
+    """
+    categorias_usuario = get_categorias_usuario(usuario)
+    categorias_padrao = get_categorias_padrao()
+    if categorias_usuario is not None:
+        return (categorias_usuario | categorias_padrao).distinct()
+    return categorias_padrao
+
+def get_ultima_transacao(usuario, tipo_transacao):
+    return Transacao.objects.filter( usuario=usuario, tipo=tipo_transacao).last()

@@ -1,4 +1,4 @@
-from comum.models import TransacaoChoices
+from comum.models import TransacaoChoices, ObjetoChoices
 from bot import emojis
 from bot.enums.enums import TipoAcao
 from comum.services import get_meses_ano
@@ -55,6 +55,25 @@ class MensagemBot():
 
         return menu_meses
 
+    @staticmethod
+    def mensagem_exibir_categorias(categorias):
+        botoes = []
+        linha = []
+        for categoria in categorias:
+            linha.append({
+                "text": f"{categoria.nome.capitalize()}",
+                "callback_data": f"categoria_{categoria.id}"   
+            })
+
+            if len(linha) == BOTOES_POR_LINHA:
+                botoes.append(linha)
+                linha = []
+        
+        if linha:
+            botoes.append(linha)
+        
+        return {'text': 'Selecione a categoria do registro:', 'botoes': botoes}
+
     # Formatação e auxílio
     @staticmethod
     def get_tipo_transacao(tipo_transacao) -> str:
@@ -76,10 +95,18 @@ class MensagemBot():
             mensagem_enviar += (
                 f'{emojis.EMOJI_ANOTACAO} {registro.descricao.capitalize()}\n'
                 f'{emojis.EMOJI_DINHEIRO} Valor: R${registro.valor}\n'
-                f'{emojis.EMOJI_DATA} Data: {data.strftime("%d/%m/%Y")} às {data.strftime("%H:%M")}\n\n'
+                f'{emojis.EMOJI_DATA} Data: {data.strftime("%d/%m/%Y")} às {data.strftime("%H:%M")}\n'
             )
+
+            if registro.categoria:
+                mensagem_enviar += (
+                    f'{emojis.EMOJI_CATEGORIA} Categoria: {registro.categoria.nome.capitalize()}\n\n'
+                )
+
+            else:
+                mensagem_enviar += '\n'
         
-        mensagem_enviar += f'<strong>Valor Total:</strong> R${valor_total}'
+        mensagem_enviar += f'<strong>Valor Total:</strong> R${valor_total:.2f}'
         return mensagem_enviar
     
     @staticmethod
@@ -241,19 +268,27 @@ class MensagemBot():
         
         return mensagem_enviar
     
+    @staticmethod
+    def mensagem_informar_nome_categoria():
+        return f'Qual é o nome da categoria que você deseja cadastrar?'
+    
     '''
     Mensagens de sucesso
     '''
     @staticmethod
-    def mensagem_sucesso_registro(tipo_transacao, valor):
-        if tipo_transacao == TransacaoChoices.FATURAMENTO:
-            mensagem_enviar = (
-                f'{emojis.EMOJI_SUCESSO} Faturamento registrado com sucesso.\n\n'
-                f'Valor: R${valor}')
+    def mensagem_sucesso_registro(valor=None, tipo_transacao=None, tipo_objeto=None):
+        if not tipo_objeto:
+            if tipo_transacao == TransacaoChoices.FATURAMENTO:
+                mensagem_enviar = (
+                    f'{emojis.EMOJI_SUCESSO} Faturamento registrado com sucesso.\n\n'
+                    f'Valor: R${valor}')
+            else:
+                mensagem_enviar = (
+                    f'{emojis.EMOJI_SUCESSO} Despesa registrado com sucesso.\n\n'
+                    f'Valor: R${valor}')
         else:
-            mensagem_enviar = (
-                f'{emojis.EMOJI_SUCESSO} Despesa registrado com sucesso.\n\n'
-                f'Valor: R${valor}')
+            if tipo_objeto == ObjetoChoices.CATEGORIA:
+                mensagem_enviar = f'{emojis.EMOJI_SUCESSO} Categoria registrada com sucesso.'
         
         return mensagem_enviar
     
@@ -326,6 +361,12 @@ class MensagemBot():
                 {
                     "text": f"{emojis.EMOJI_RELATORIO} Relatórios",
                     "callback_data": TipoAcao.MENU_RELATORIO
+                }
+            ],
+            [
+                {
+                    "text": f"{emojis.EMOJI_CONFIGURACAO} Configurações",
+                    "callback_data": TipoAcao.MENU_CONFIGURACAO
                 }
             ],
         ]
@@ -421,6 +462,54 @@ class MensagemBot():
             'botoes': botoes,
             'text': (
                 f'{emojis.EMOJI_RELATORIO} Relatórios\n\n'
+                'O que você deseja fazer?'
+            )
+        }   
+
+        return menu
+    
+    @staticmethod
+    def mensagem_menu_configuracao():
+        botoes = [
+            [
+                {
+                    "text": "Categorias",
+                    "callback_data": TipoAcao.MENU_CATEGORIA
+                }
+            ],
+        ]
+
+        menu = {
+            'botoes': botoes,
+            'text': (
+                f'{emojis.EMOJI_CONFIGURACAO} Configurações\n\n'
+                'O que você deseja fazer?'
+            )
+        }   
+
+        return menu
+
+    @staticmethod
+    def mensagem_menu_categoria():
+        botoes = [
+            [
+                {
+                    "text": "Cadastrar Categoria",
+                    "callback_data": TipoAcao.CADASTRO_CATEGORIA
+                }
+            ],
+            [
+                {
+                    "text": "Excluir Categoria",
+                    "callback_data": TipoAcao.EXCLUSAO_CATEGORIA
+                }
+            ],
+        ]
+
+        menu = {
+            'botoes': botoes,
+            'text': (
+                f'{emojis.EMOJI_CATEGORIA} Categorias\n\n'
                 'O que você deseja fazer?'
             )
         }   

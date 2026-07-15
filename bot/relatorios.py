@@ -1,5 +1,5 @@
 from comum.models import StatusUsuario, Transacao, TransacaoChoices
-from comum.services import calcular_valor_total_registros, converter_numero_mes, get_meses_ano, calcular_percentual
+from comum.services import calcular_valor_total_registros, converter_acao_id, get_meses_ano, calcular_percentual
 
 EXIBICAO_CONFIG = {
     TransacaoChoices.FATURAMENTO : {
@@ -32,7 +32,7 @@ class Relatorio():
 
         if usuario.status == configuracao['status_aguardando_ver']:
             if acao is not None:
-                numero_mes = converter_numero_mes(acao)
+                numero_mes = converter_acao_id(acao)
 
                 if numero_mes is None:
                     usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
@@ -72,7 +72,7 @@ class Relatorio():
         if usuario.status == StatusUsuario.AGUARDANDO_VER_RESUMO:
             if acao is not None:
                 meses = get_meses_ano()
-                numero_mes = converter_numero_mes(acao)
+                numero_mes = converter_acao_id(acao)
 
                 if numero_mes is None:
                     usuario.set_status(StatusUsuario.AGUARDANDO_MENU)

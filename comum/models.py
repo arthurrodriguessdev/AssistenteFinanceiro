@@ -26,6 +26,8 @@ class StatusUsuario(models.IntegerChoices):
     AGUARDANDO_VER_DESPESA_EXCLUSAO = 18, 'Aguardando Visualizar Despesa Exclusão'
     CONFIRMOU_CANCELOU_EXCLUSAO_DESPESA = 19, 'Confirmou ou Cancelou Exclusão Despesa'
 
+    AGUARDANDO_INFORMAR_CATEGORIA_DESPESA = 23, 'Aguardando Informar Categoria Despesa'
+
     # Relatórios
     AGUARDANDO_INFORMAR_MES_DESPESA = 11, 'Aguardando Informar Mês Despesa'
     AGUARDANDO_INFORMAR_MES_FATURAMENTO = 12, 'Aguardando Informar Mês Faturamento'
@@ -34,11 +36,17 @@ class StatusUsuario(models.IntegerChoices):
     AGUARDANDO_VER_FATURAMENTO = 14, 'Aguardando Visualizar Faturamento'
     AGUARDANDO_MES_RESUMO = 21, 'Aguardando Mês Resumo'
     AGUARDANDO_VER_RESUMO = 22, 'Aguardando Ver Resumo'
-    
+
+    # Categorias
+    AGUARDANDO_INFORMAR_NOME_CATEGORIA_CADASTRO = 24, 'Aguardando Informar Nome Categoria'
 
 class TransacaoChoices(models.IntegerChoices):
     FATURAMENTO = 1, "Faturamento"
     DESPESA = 2, "Despesa"
+
+
+class ObjetoChoices(models.IntegerChoices):
+    CATEGORIA = 1, "Categoria"
 
 
 class Usuario(models.Model):
@@ -66,12 +74,26 @@ class Usuario(models.Model):
         self.save()
 
 
+class Categoria(models.Model):
+    nome = models.CharField(max_length=100, null=False, blank=False)
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='categorias', null=True, blank=True)
+    padrao = models.BooleanField(default=False) # Categorias criadas automaticamente pelo sistema: true e usuario: null
+
+    class Meta:
+        verbose_name='Categoria'
+        verbose_name_plural='Categorias'
+    
+    def __str__(self):
+        return f'Categoria: {self.nome}'
+    
+
 class Transacao(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='transacoes')
     tipo = models.IntegerField(choices=TransacaoChoices)
     descricao = models.CharField(max_length=250, blank=True)
     registrada_em = models.DateTimeField(auto_now_add=True)
     valor = models.DecimalField(decimal_places=2, max_digits=10)
+    categoria = models.ForeignKey(Categoria, on_delete=models.PROTECT, related_name='categorias', null=True, blank=True)
 
     class Meta:
         verbose_name='Transação'

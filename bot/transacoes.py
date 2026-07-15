@@ -1,5 +1,5 @@
 from comum.models import StatusUsuario, Transacao, TransacaoChoices
-from comum.services import calcular_valor_total_registros, converter_valor_inteiro, converter_numero_mes
+from comum.services import calcular_valor_total_registros, converter_valor_inteiro, converter_acao_id
 
 TRANSACOES_CONFIG = {
     TransacaoChoices.FATURAMENTO : {
@@ -32,7 +32,7 @@ class TransacaoService():
         
         elif usuario.status == configuracao['status_aguardando_ver']:
             if acao is not None:
-                numero_mes = converter_numero_mes(acao)
+                numero_mes = converter_acao_id(acao)
                 
                 if numero_mes is None:
                     usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
