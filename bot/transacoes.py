@@ -35,7 +35,7 @@ class TransacaoService():
                 numero_mes = converter_acao_id(acao)
                 
                 if numero_mes is None:
-                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                    usuario.aguardar_menu()
                     response['status'] = 'erro'
                     return response
                 
@@ -75,7 +75,7 @@ class TransacaoService():
                     id_registro = acao[1]
 
                     id_registro = converter_valor_inteiro(id_registro)
-                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                    usuario.aguardar_menu()
                     if id_registro is None:
                         response['status'] = 'erro'
                         return response
@@ -87,7 +87,7 @@ class TransacaoService():
                     except Transacao.DoesNotExist:
                         response['status'] = 'erro' 
                 else:
-                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                    usuario.aguardar_menu()
                     response['status'] = 'mostrar_mensagem_cancelou_operacao'
 
         return response

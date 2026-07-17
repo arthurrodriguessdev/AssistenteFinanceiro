@@ -184,7 +184,7 @@ class TelegramService():
                     transacao.save()
                 except Exception:
                     logger.exception("Erro ao salvar descrição da despesa.")
-                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                    usuario.aguardar_menu()
                     return TelegramClient.enviar_mensagem(MensagemBot.mensagem_erro(),self.chat_id)
                 
                 usuario.set_status(StatusUsuario.AGUARDANDO_INFORMAR_CATEGORIA_DESPESA)
@@ -315,13 +315,13 @@ class TelegramService():
             # Erro na conversão
             if valor_operacao is None:
                 mensagem_enviar = MensagemBot.mensagem_erro_conversao_valor()
-                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                usuario.aguardar_menu()
                 return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
             
             # Valida número negativo
             if valor_operacao <= 0:
                 mensagem_enviar = MensagemBot.mensagem_erro_valor_negativo()
-                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                usuario.aguardar_menu()
                 return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
             
             transacao = Transacao(
@@ -338,7 +338,7 @@ class TelegramService():
 
             except ValidationError as e:
                 logger.exception("Erro no registro de transação.")
-                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                usuario.aguardar_menu()
 
                 if "valor" in e.message_dict:
                     mensagem_enviar = mensagem_enviar = MensagemBot.mensagem_erro_tamanho_valor()
@@ -366,7 +366,7 @@ class TelegramService():
                         transacao.categoria = categoria_selecionada
                         transacao.save()
 
-                        usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                        usuario.aguardar_menu()
                         mensagem_enviar = MensagemBot.mensagem_sucesso_registro(transacao.valor, tipo_transacao, None)
                         return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
 
@@ -381,9 +381,9 @@ class TelegramService():
                         return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
                     
                     finally:
-                        usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                        usuario.aguardar_menu()
                 
-                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                usuario.aguardar_menu()
                 return TelegramClient.enviar_mensagem(MensagemBot.mensagem_erro(), self.chat_id)
 
     def exibir(self, tipo_registro, usuario, acao):
@@ -421,7 +421,7 @@ class TelegramService():
             mensagem_enviar = MensagemBot.mensagem_exibir_registros_exclusao(registros, tipo_registro)
 
             if not registros:
-                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                usuario.aguardar_menu()
                 return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
             return TelegramClient.enviar_mensagens_botoes(mensagem_enviar['text'], self.chat_id, mensagem_enviar['botoes'])
 
@@ -453,7 +453,7 @@ class TelegramService():
             return TelegramClient.enviar_mensagens_botoes(mensagem_enviar['text'], self.chat_id, mensagem_enviar['botoes'])
 
         elif status == 'mostrar_resumo':
-            usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+            usuario.aguardar_menu()
             mensagem_enviar = MensagemBot.mensagem_resumo_mes(resumo_mes)
             return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
 
@@ -469,7 +469,7 @@ class TelegramService():
         
         elif status == 'sucesso':
             mensagem_enviar = MensagemBot.mensagem_sucesso_registro(None, None, ObjetoChoices.CATEGORIA)
-            usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+            usuario.aguardar_menu()
             return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
         
         return TelegramClient.enviar_mensagem(MensagemBot.mensagem_erro(),self.chat_id)
@@ -484,7 +484,7 @@ class TelegramService():
             categorias = get_categorias_podem_ser_excluidas_usuario(usuario)
             mensagem_enviar = MensagemBot.mensagem_exibir_categorias(categorias, 'exclusao')
             if not categorias.exists():
-                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                usuario.aguardar_menu()
 
             return TelegramClient.enviar_mensagens_botoes(mensagem_enviar['text'], self.chat_id, mensagem_enviar['botoes'])
         
@@ -520,6 +520,6 @@ class TelegramService():
         - Seleciona no dicionário, chama o método e guarda na variável
         - Passa valores das chaves do dicionário retornado para o método de envio de mensagem
         """
-        usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+        usuario.aguardar_menu()
         menu = self.MENUS[tipo_menu]()
         TelegramClient.enviar_mensagens_botoes(menu['text'], self.chat_id, menu['botoes'])

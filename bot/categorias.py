@@ -68,26 +68,26 @@ class CategoriaService():
                 id_categoria = converter_acao_id(acao)
 
                 if not id_categoria:
-                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                    usuario.aguardar_menu()
                     response['status'] = 'erro'
                     return response
 
                 try:
                     Categoria.objects.get(id=id_categoria).delete()
                     response['status'] = 'mostrar_mensagem_excluiu_sucesso'
-                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                    usuario.aguardar_menu()
 
                 except Categoria.DoesNotExist:
                     logger.exception('A categoria não existe para ser excluída.')
                     response['status'] = 'erro'
-                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU) 
+                    usuario.aguardar_menu() 
 
                 except Exception:
                     logger.exception('Erro ao tentar excluir a categoria')
                     response['status'] = 'erro'
-                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU) 
+                    usuario.aguardar_menu() 
             else:
                 response['status'] = 'mostrar_mensagem_cancelou_operacao'
-                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                usuario.aguardar_menu()
 
         return response

@@ -76,6 +76,9 @@ class Usuario(models.Model):
         self.status = status
         self.save()
 
+    def aguardar_menu(self):
+        self.set_status(StatusUsuario.AGUARDANDO_MENU)
+
 
 class Categoria(models.Model):
     nome = models.CharField(max_length=100, null=False, blank=False)

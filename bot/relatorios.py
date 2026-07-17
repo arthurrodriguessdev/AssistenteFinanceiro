@@ -35,7 +35,7 @@ class Relatorio():
                 numero_mes = converter_acao_id(acao)
 
                 if numero_mes is None:
-                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                    usuario.aguardar_menu()
                     response['status'] = 'erro'
                     return response
             
@@ -54,7 +54,7 @@ class Relatorio():
                 response['status'] = 'mostrar_registros'
 
             else:
-                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                usuario.aguardar_menu()
                 response['status'] = 'erro'
                 return response
 
@@ -75,7 +75,7 @@ class Relatorio():
                 numero_mes = converter_acao_id(acao)
 
                 if numero_mes is None:
-                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                    usuario.aguardar_menu()
                     response['status'] = 'erro'
                     return response
             
@@ -110,7 +110,7 @@ class Relatorio():
                         response['maior_despesa'] = maior_despesa
                         
                 else:
-                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                    usuario.aguardar_menu()
                     response['status'] = 'erro'
                     return response
         return response
