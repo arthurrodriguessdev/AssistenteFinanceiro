@@ -88,5 +88,17 @@ def get_todas_categorias_usuario(usuario):
         return (categorias_usuario | categorias_padrao).distinct()
     return categorias_padrao
 
+def get_categorias_podem_ser_excluidas_usuario(usuario):
+    categorias = get_categorias_usuario(usuario)
+    if not categorias:
+        return None
+    
+    ids_categorias_aptas_exluir = []
+    for categoria in categorias:
+        if not categoria.transacoes.exists():
+            ids_categorias_aptas_exluir.append(categoria.pk)
+
+    return categorias.filter(pk__in=ids_categorias_aptas_exluir)
+
 def get_ultima_transacao(usuario, tipo_transacao):
     return Transacao.objects.filter( usuario=usuario, tipo=tipo_transacao).last()

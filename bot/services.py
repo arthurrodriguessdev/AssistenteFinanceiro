@@ -9,7 +9,8 @@ from bot.relatorios import Relatorio
 from bot.transacoes import TransacaoService
 from bot.categorias import CategoriaService
 from comum.models import StatusUsuario, Transacao, TransacaoChoices, Categoria, ObjetoChoices
-from comum.services import converter_valor_decimal, get_usuario, get_todas_categorias_usuario, converter_acao_id, get_ultima_transacao
+from comum.services import converter_valor_decimal, get_usuario, get_todas_categorias_usuario, converter_acao_id, get_ultima_transacao, \
+get_categorias_podem_ser_excluidas_usuario
 from comum.usuario_service import UsuarioService
 from bot.enums.enums import TipoMenu
 
@@ -45,6 +46,7 @@ class TelegramClient():
         json = {
             'chat_id': chat_id,
             'text': text if text != '' else '',
+            'parse_mode': 'HTML',
             'reply_markup':{
                 'inline_keyboard':botoes
             }
@@ -134,7 +136,7 @@ class TelegramService():
             'exibir_faturamentos': lambda: self.exibir(TransacaoChoices.FATURAMENTO, usuario, acao),
             'resumo_mes': lambda: self.resumo_mes(usuario, acao),
             'cadastro_categoria': lambda: self.registrar_categoria(usuario),
-            'exclusao_categoria': lambda: self.excluir_categioria(usuario)
+            'exclusao_categoria': lambda: self.excluir_categoria(usuario, None)
         }
         
         # Processa as ações e chama o método equivalente
@@ -150,6 +152,7 @@ class TelegramService():
             elif self.processar_exclusao(usuario, acao): return True
             elif self.processar_resumo(usuario, acao): return True
             elif self.processar_cadastro_categoria(usuario): return True
+            elif self.processar_exclusao_categoria(usuario, acao): return True
             else: return self.menu(usuario, TipoMenu.PRINCIPAL)
         else:
             return self.boas_vindas(usuario)
@@ -262,6 +265,16 @@ class TelegramService():
             return True
         return False
     
+    def processar_exclusao_categoria(self, usuario, acao):
+        if usuario.status == StatusUsuario.AGUARDANDO_EXCLUIR_CATEGORIA:
+            self.excluir_categoria(usuario, acao)
+            return True
+        
+        elif usuario.status == StatusUsuario.CONFIRMOU_CANCELOU_EXCLUSAO_CATEGORIA:
+            self.excluir_categoria(usuario, acao)
+            return True 
+        return False
+
     def boas_vindas(self, usuario):
         response = services.gerar_plano()
 
@@ -340,7 +353,7 @@ class TelegramService():
         elif usuario.status == configuracao['status_categoria']:
             if acao is None:
                 categorias = get_todas_categorias_usuario(usuario)
-                mensagem_enviar = MensagemBot.mensagem_exibir_categorias(categorias)
+                mensagem_enviar = MensagemBot.mensagem_exibir_categorias(categorias, 'registro')
                 return TelegramClient.enviar_mensagens_botoes(mensagem_enviar['text'], self.chat_id, mensagem_enviar['botoes'])
 
             else:
@@ -414,11 +427,11 @@ class TelegramService():
 
         elif status and status == 'mostrar_confirmacao':
             registro_excluir = excluir.get('registro_excluir', None)
-            mensagem_enviar = MensagemBot.mensagem_confirmar_exclusao(registro_excluir)
+            mensagem_enviar = MensagemBot.mensagem_confirmar_exclusao(registro_excluir, None)
             return TelegramClient.enviar_mensagens_botoes(mensagem_enviar['text'], self.chat_id, mensagem_enviar['botoes'])
         
         elif status and status == 'mostrar_mensagem_excluiu_sucesso':
-            mensagem_enviar = MensagemBot.mensagem_exclusao_confirmada(tipo_registro)
+            mensagem_enviar = MensagemBot.mensagem_exclusao_confirmada(tipo_registro, None)
             return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
         
         elif status and status == 'mostrar_mensagem_cancelou_operacao':
@@ -461,9 +474,37 @@ class TelegramService():
         
         return TelegramClient.enviar_mensagem(MensagemBot.mensagem_erro(),self.chat_id)
         
-    def excluir_categoria(self, usuario):
-        ...
+    def excluir_categoria(self, usuario, acao):
+        self.callback()
 
+        resultado = CategoriaService.excluir(usuario, acao)
+        status = resultado.get('status', None)
+
+        if status == 'mostrar_categorias':
+            categorias = get_categorias_podem_ser_excluidas_usuario(usuario)
+            mensagem_enviar = MensagemBot.mensagem_exibir_categorias(categorias, 'exclusao')
+            if not categorias.exists():
+                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+
+            return TelegramClient.enviar_mensagens_botoes(mensagem_enviar['text'], self.chat_id, mensagem_enviar['botoes'])
+        
+        elif status == 'mostrar_confirmacao':
+            categoria_excluir = resultado.get('categoria', None)
+            mensagem_enviar = MensagemBot.mensagem_confirmar_exclusao(None, categoria_excluir)
+            return TelegramClient.enviar_mensagens_botoes(mensagem_enviar['text'], self.chat_id, mensagem_enviar['botoes'])
+        
+        elif status and status == 'mostrar_mensagem_excluiu_sucesso':
+            mensagem_enviar = MensagemBot.mensagem_exclusao_confirmada(None, ObjetoChoices.CATEGORIA)
+            return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+        
+        elif status and status == 'mostrar_mensagem_cancelou_operacao':
+            mensagem_enviar = MensagemBot.mensagem_exclusao_cancelada(None, ObjetoChoices.CATEGORIA)
+            return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+        
+        elif status and status == 'erro':
+            mensagem_enviar = MensagemBot.mensagem_erro()
+            return TelegramClient.enviar_mensagem(mensagem_enviar, self.chat_id)
+        
     # Métodos auxiliares (não são funcionalidades)
     def callback(self):
         """

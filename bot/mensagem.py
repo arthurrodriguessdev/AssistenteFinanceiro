@@ -56,7 +56,11 @@ class MensagemBot():
         return menu_meses
 
     @staticmethod
-    def mensagem_exibir_categorias(categorias):
+    def mensagem_exibir_categorias(categorias, acao):
+        if not categorias.exists():
+            text = 'Não há categorias <strong>cadastradas por você</strong> para serem excluídas.'
+            return {'text': text, 'botoes': []}
+        
         botoes = []
         linha = []
         for categoria in categorias:
@@ -72,7 +76,16 @@ class MensagemBot():
         if linha:
             botoes.append(linha)
         
-        return {'text': 'Selecione a categoria do registro:', 'botoes': botoes}
+        if acao == 'exclusao':
+            text = 'Selecione a categoria que você deseja excluir:\n\n'
+            text += (
+                'Apenas categorias que <strong>não possuem transações vinculadas</strong> são exibidas, '
+                'pois categorias em uso não podem ser removidas.'
+            )
+
+        elif acao == 'registro':
+            text = 'Selecione a categoria do registro:'
+        return {'text': text, 'botoes': botoes}
 
     # Formatação e auxílio
     @staticmethod
@@ -200,22 +213,37 @@ class MensagemBot():
         
         return {'text': mensagem_enviar, 'botoes': botoes}
 
+    """
+    Exibe a mensagem de exclusão de:
+    - Transação
+    - Categoria
+    """
     @staticmethod
-    def mensagem_confirmar_exclusao(registro):
-        tipo = 'despesa' if registro.tipo == TransacaoChoices.DESPESA else 'faturamento'
-        data = registro.registrada_em
-        mensagem_enviar = (
-            f'Tem certeza que deseja excluir o registro de {tipo} abaixo?\n\n'
-            f'{emojis.EMOJI_ANOTACAO} {registro.descricao.capitalize()}\n'
-            f'{emojis.EMOJI_DINHEIRO} Valor: R${registro.valor}\n'
-            f'{emojis.EMOJI_DATA} Data: {data.strftime("%d/%m/%Y")} às {data.strftime("%H:%M")}\n\n'
-        )
+    def mensagem_confirmar_exclusao(registro=None, categoria=None):
+        # O parâmetro objeto corresponde a qualquer outro que não seja transação. Ex: categoria
+        if categoria:
+            mensagem_enviar = (
+                f'Tem certeza que deseja excluir o registro a categoria abaixo?\n\n'
+                f'{emojis.EMOJI_CATEGORIA} {categoria.nome.capitalize()}\n'
+            )
+            objeto_excluir = categoria
+
+        else:
+            tipo = 'despesa' if registro.tipo == TransacaoChoices.DESPESA else 'faturamento'
+            data = registro.registrada_em
+            mensagem_enviar = (
+                f'Tem certeza que deseja excluir o registro de {tipo} abaixo?\n\n'
+                f'{emojis.EMOJI_ANOTACAO} {registro.descricao.capitalize()}\n'
+                f'{emojis.EMOJI_DINHEIRO} Valor: R${registro.valor}\n'
+                f'{emojis.EMOJI_DATA} Data: {data.strftime("%d/%m/%Y")} às {data.strftime("%H:%M")}\n\n'
+            )
+            objeto_excluir = registro
 
         botoes = []
         botoes.append([
             {
                 "text": f"{emojis.EMOJI_SUCESSO} Confirmar",
-                "callback_data": f"{TipoAcao.CONFIRMAR}_{registro.pk}"
+                "callback_data": f"{TipoAcao.CONFIRMAR}_{objeto_excluir.pk}"
             }
         ])
 
@@ -229,16 +257,26 @@ class MensagemBot():
         return {'text': mensagem_enviar, 'botoes': botoes}
 
     @staticmethod
-    def mensagem_exclusao_confirmada(tipo_registro):
-        """
-        Retorna 'despesa' ou 'faturamento' verificando o tipo dela
-        """
-        tipo = 'despesa' if tipo_registro == TransacaoChoices.DESPESA else 'faturamento'
-        return (f'{emojis.EMOJI_SUCESSO} O registro de {tipo} foi excluído com sucesso!')
+    def mensagem_exclusao_confirmada(tipo_registro=None, tipo_objeto=None):
+        emoji_sucesso = emojis.EMOJI_SUCESSO
+
+        if tipo_objeto == ObjetoChoices.CATEGORIA:
+            nome_objeto = 'categoria'
+        else:
+            nome_objeto = MensagemBot.get_tipo_transacao(tipo_registro)
+
+        return f'{emoji_sucesso} O registro de {nome_objeto} foi excluído com sucesso!'
     
     @staticmethod
-    def mensagem_exclusao_cancelada(tipo_registro):
-        return (f'{emojis.EMOJI_ERRO} A exclusão do registro de {MensagemBot.get_tipo_transacao(tipo_registro)} foi cancelada.')
+    def mensagem_exclusao_cancelada(tipo_registro, tipo_objeto):
+        emoji_erro = emojis.EMOJI_ERRO
+
+        if tipo_objeto == ObjetoChoices.CATEGORIA:
+            nome_objeto = 'categoria'
+        else:
+            nome_objeto = MensagemBot.get_tipo_transacao(tipo_registro)
+
+        return f'{emoji_erro} A exclusão do registro de {nome_objeto} foi cancelada.'
         
     @staticmethod
     def mensagem_informar_valor(tipo_transacao):

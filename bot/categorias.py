@@ -1,7 +1,9 @@
 import logging
 from comum.models import StatusUsuario, Categoria
+from comum.services import converter_acao_id
 
 logger = logging.getLogger('__name__')
+
 
 class CategoriaService():
     @staticmethod
@@ -33,5 +35,59 @@ class CategoriaService():
         return response
     
     @staticmethod
-    def excluir():
-        ...
+    def excluir(usuario, acao):
+        response = {}
+        primeira_acao = False
+        if usuario.status == StatusUsuario.AGUARDANDO_MENU:
+            primeira_acao = True
+            usuario.set_status(StatusUsuario.AGUARDANDO_EXCLUIR_CATEGORIA)
+
+        if usuario.status == StatusUsuario.AGUARDANDO_EXCLUIR_CATEGORIA and acao:
+            response['status'] = 'mostrar_confirmacao'
+            id_categoria = converter_acao_id(acao)
+
+            if not id_categoria:
+                
+                response['status'] = 'erro'
+                return response
+            
+            try:
+                categoria = Categoria.objects.get(pk=id_categoria)
+                response['categoria'] = categoria
+                usuario.set_status(StatusUsuario.CONFIRMOU_CANCELOU_EXCLUSAO_CATEGORIA)
+
+            except Categoria.DoesNotExist:
+                response['status'] = 'erro'
+                return response
+            
+        elif usuario.status == StatusUsuario.AGUARDANDO_EXCLUIR_CATEGORIA:
+            response['status'] = 'mostrar_categorias'
+
+        elif usuario.status == StatusUsuario.CONFIRMOU_CANCELOU_EXCLUSAO_CATEGORIA and acao:
+            if acao.startswith('confirmar'):
+                id_categoria = converter_acao_id(acao)
+
+                if not id_categoria:
+                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+                    response['status'] = 'erro'
+                    return response
+
+                try:
+                    Categoria.objects.get(id=id_categoria).delete()
+                    response['status'] = 'mostrar_mensagem_excluiu_sucesso'
+                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+
+                except Categoria.DoesNotExist:
+                    logger.exception('A categoria não existe para ser excluída.')
+                    response['status'] = 'erro'
+                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU) 
+
+                except Exception:
+                    logger.exception('Erro ao tentar excluir a categoria')
+                    response['status'] = 'erro'
+                    usuario.set_status(StatusUsuario.AGUARDANDO_MENU) 
+            else:
+                response['status'] = 'mostrar_mensagem_cancelou_operacao'
+                usuario.set_status(StatusUsuario.AGUARDANDO_MENU)
+
+        return response
